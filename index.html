@@ -21,7 +21,7 @@
     </nav>
 
     <header>
-        <button>Add Pokemon</button>
+        <button id="add-pokemon-btn">Add Pokemon</button>
     </header>
 
     <div class="current-roster">
@@ -41,5 +41,153 @@
     <div class="share-team hide-mobile">
         <button>Share/Export Team</button>
     </div>
+
+    <!-- Add Pokemon modal / panel (hidden by default) -->
+    <div id="add-modal" style="display:none; position:fixed; left:10%; top:10%; right:10%; bottom:10%; background:#fff; border:1px solid #ccc; padding:16px; overflow:auto; z-index:1000;">
+        <button id="close-add-modal" style="float:right">Close</button>
+        <h2>Add Pokemon to Box (user: <span id="current-user">local_user</span>)</h2>
+        <div>
+            <label for="pokemon-name">Nickname / Name:</label>
+            <input id="pokemon-name" placeholder="e.g. Bath Time" />
+        </div>
+        <div>
+            <label for="pokemon-cp">CP (Combat Power):</label>
+            <input id="pokemon-cp" type="number" min="0" placeholder="e.g. 523" />
+        </div>
+    <p>Click a sprite to select and add it to your Box.</p>
+        <div id="sprites-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+        <div id="add-message" style="color:green;margin-top:8px"></div>
+    </div>
+
+    <!-- Current team area -->
+    <section id="team-section">
+        <h2>Your Box</h2>
+        <div id="team-list">(loading...)</div>
+    </section>
+
+    <script>
+        const API_BASE = 'http://127.0.0.1:5000';
+        const USER_ID = 'local_user';
+
+        document.getElementById('add-pokemon-btn').addEventListener('click', openAddModal);
+        document.getElementById('close-add-modal').addEventListener('click', closeAddModal);
+
+        function openAddModal(e) {
+            document.getElementById('add-modal').style.display = 'block';
+            loadSprites();
+        }
+
+        function closeAddModal(e) {
+            document.getElementById('add-modal').style.display = 'none';
+            document.getElementById('add-message').textContent = '';
+        }
+
+        async function loadSprites() {
+            const listEl = document.getElementById('sprites-list');
+            listEl.innerHTML = 'Loading...';
+            try {
+                const res = await fetch(`${API_BASE}/api/v1/sprites`);
+                if (!res.ok) throw new Error('Failed to load sprites');
+                const json = await res.json();
+                listEl.innerHTML = '';
+                const sprites = json.sprites || [];
+                sprites.forEach(name => {
+                    const img = document.createElement('img');
+                    img.src = `${API_BASE}/assets/${encodeURIComponent(name)}`;
+                    img.alt = name;
+                    img.title = name;
+                    img.style.width = '64px';
+                    img.style.height = '64px';
+                    img.style.cursor = 'pointer';
+                    img.addEventListener('click', () => onSpriteClick(name));
+                    listEl.appendChild(img);
+                });
+                if (sprites.length === 0) listEl.textContent = '(no sprites found)';
+            } catch (err) {
+                listEl.textContent = 'Error loading sprites: ' + err.message;
+            }
+        }
+
+        async function onSpriteClick(spriteName) {
+            const nameInput = document.getElementById('pokemon-name');
+            const nickname = nameInput.value && nameInput.value.trim() ? nameInput.value.trim() : spriteName.replace(/\.png$/i, '');
+            const msgEl = document.getElementById('add-message');
+            msgEl.style.color = 'black';
+            msgEl.textContent = 'Adding...';
+            try {
+                const cpInput = document.getElementById('pokemon-cp');
+                const cpVal = cpInput && cpInput.value ? Number(cpInput.value) : null;
+
+                const res = await fetch(`${API_BASE}/api/v1/box/${encodeURIComponent(USER_ID)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: nickname, sprite: spriteName, cp: cpVal })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to add');
+                msgEl.style.color = 'green';
+                msgEl.textContent = 'Added to box.';
+                // refresh team list
+                loadTeam();
+            } catch (err) {
+                msgEl.style.color = 'red';
+                msgEl.textContent = 'Error: ' + err.message;
+            }
+        }
+
+        async function loadTeam() {
+            const el = document.getElementById('team-list');
+            el.textContent = 'Loading...';
+            try {
+                const res = await fetch(`${API_BASE}/api/v1/box/${encodeURIComponent(USER_ID)}`);
+                if (!res.ok) throw new Error('Failed to load box');
+                const json = await res.json();
+                const team = json.box || [];
+                if (team.length === 0) {
+                    el.textContent = '(empty)';
+                    return;
+                }
+                el.innerHTML = '';
+                team.forEach((p, idx) => {
+                    const div = document.createElement('div');
+                    div.style.display = 'flex';
+                    div.style.alignItems = 'center';
+                    div.style.gap = '8px';
+                    const img = document.createElement('img');
+                    img.src = p.sprite.startsWith('http') ? p.sprite : `${API_BASE}/assets/${encodeURIComponent(p.sprite)}`;
+                    img.style.width = '48px';
+                    img.style.height = '48px';
+                    const name = document.createElement('div');
+                    name.textContent = p.name + (p.cp !== undefined && p.cp !== null ? ` (CP ${p.cp})` : '');
+                    const btn = document.createElement('button');
+                    btn.textContent = 'Remove';
+                    btn.addEventListener('click', async () => {
+                        try {
+                            const resp = await fetch(`${API_BASE}/api/v1/box/${encodeURIComponent(USER_ID)}/${idx}`, { method: 'DELETE' });
+                            if (!resp.ok) {
+                                const d = await resp.json();
+                                throw new Error(d.error || 'Remove failed');
+                            }
+                            loadTeam();
+                        } catch (er) {
+                            alert('Error removing: ' + er.message);
+                        }
+                    });
+                    div.appendChild(img);
+                    div.appendChild(name);
+                    div.appendChild(btn);
+                    el.appendChild(div);
+                });
+            } catch (err) {
+                el.textContent = 'Error: ' + err.message;
+            }
+        }
+
+        // initial load
+        window.addEventListener('load', () => {
+            document.getElementById('current-user').textContent = USER_ID;
+            loadTeam();
+        });
+    </script>
 </body>
 </html>
