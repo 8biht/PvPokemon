@@ -25,9 +25,22 @@
             <button id="add-pokemon-btn">Add Pokemon</button>
         </header>
 
+        <!-- <div class="current-roster">
+            <h1>Current Roster</h1>
+            <button>see more</button> ///////MOVE FROM BELOW TO NEXT COMMENT BLOCK TO AFTER CURRENT ROSTER//////
+        </div> -->
+
         <div class="recommended-teams">
             <h2>Recommended Teams</h2>
             <button>generate more</button>
+        </div>
+
+        <div class="type-chart hide-mobile">
+            <a href="#">Type Matchup Chart</a>
+        </div>
+
+        <div class="share-team hide-mobile">
+            <button>Share/Export Team</button>
         </div>
 
         <!-- Add Pokemon modal / panel (hidden by default) -->
@@ -52,14 +65,6 @@
             <h2>Current Roster</h2>
             <div id="team-list">(loading...)</div>
         </section>
-
-                <div class="type-chart hide-mobile">
-            <a href="#">Type Matchup Chart</a>
-        </div>
-
-        <div class="share-team hide-mobile">
-            <button>Share/Export Team</button>
-        </div>
 
         <script>
             const API_BASE = 'http://127.0.0.1:5000';
