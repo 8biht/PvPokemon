@@ -1,3 +1,5 @@
+python
+pip
 Flask
 requests
 flask-cors
