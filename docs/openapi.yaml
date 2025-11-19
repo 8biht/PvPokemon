@@ -1,0 +1,100 @@
+openapi: 3.0.0
+info:
+  title: PvPokemon API
+  version: 1.0.0
+servers:
+  - url: http://localhost:5000
+paths:
+  /api/v1/box/{user_id}:
+    get:
+      summary: Get user's box
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Box payload
+          content:
+            application/json:
+              example:
+                box:
+                  - name: "Buddy"
+                    sprite: "001.png"
+                    cp: 500
+                    quick_move: "Tackle"
+                    charge_moves: ["Hydro Pump"]
+    post:
+      summary: Add Pokemon to box
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                sprite: { type: string }
+                cp: { type: integer }
+                quick_move: { type: string }
+                charge_moves:
+                  type: array
+                  items: { type: string }
+      responses:
+        '200': { description: Updated box }
+  /api/v1/box/{user_id}/{slot}:
+    put:
+      summary: Update a box entry
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: slot
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                sprite: { type: string }
+                cp: { type: integer }
+                quick_move: { type: string }
+                charge_moves: { type: array, items: { type: string } }
+      responses:
+        '200': { description: Updated box }
+    delete:
+      summary: Remove a box entry
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: slot
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: Removed entry and updated box }
+  /api/v1/pokedex:
+    get:
+      summary: Get pokedex summary
+      responses:
+        '200': { description: Pokedex list }
+  /assets/{filename}:
+    get:
+      summary: Serve sprite assets
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Image file }

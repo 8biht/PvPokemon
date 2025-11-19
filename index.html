@@ -4,58 +4,83 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PvPokemon</title>
-</head>
+    <style>
+        /* Minimal layout */
+        #sprites-list img { margin:4px; border:2px solid transparent; }
+        #sprites-list img.selected { outline:3px solid #2a9df4; }
+        #add-modal { background:#fff; }
+    </style>
+    </head>
 <body>
-    <nav>
-        <a href="#" class="menu-open hide-desktop">
-<!--<img src="blah" alt="blah">-->
-        </a>
-        <ul>
-            <li>
-                <a href="#">Type Matchup Chart</a>
-            </li>
-            <li>
-                <button>Share/Export Team</button>
-            </li>
-        </ul>
-    </nav>
+    <div class="wrap"></div>
+        <nav>
+            <a href="#" class="menu-open hide-desktop">
+    <!--<img src="blah" alt="blah">-->
+            </a>
+            <ul>
+                <li>
+                    <a href="#" id="open-type-chart">Type Matchup Chart</a>
+                </li>
+                <li>
+                    <button>Share/Export Team</button>
+                </li>
+            </ul>
+        </nav>
 
-    <header>
-        <button id="add-pokemon-btn">Add Pokemon</button>
-    </header>
+        <header>
+            <button id="add-pokemon-btn">Add Pokemon</button>
+            <button id="make-team-btn">Make Team</button>
+        </header>
 
-    <div class="current-roster">
-        <h1>Current Roster</h1>
-        <button>see more</button>
-    </div>
+        <!-- <div class="current-roster">
+            <h1>Current Roster</h1>
+            <button>see more</button> ///////MOVE FROM BELOW TO NEXT COMMENT BLOCK TO AFTER CURRENT ROSTER//////
+        </div> -->
 
-    <div class="recommended-teams">
-        <h1>Recommended Teams</h1>
-        <button>generate more</button>
-    </div>
+        <div class="recommended-teams">
+            <h2>Recommended Teams</h2>
+            <button>generate more</button>
+        </div>
 
-    <div class="type-chart hide-mobile">
-        <a href="#">Type Matchup Chart</a>
-    </div>
+        <div class="type-chart hide-mobile">
+            <a href="#">Type Matchup Chart</a>
+        </div>
 
-    <div class="share-team hide-mobile">
-        <button>Share/Export Team</button>
-    </div>
+        <div class="share-team hide-mobile">
+            <button>Share/Export Team</button>
+        </div>
 
-    <!-- Add Pokemon modal / panel (hidden by default) -->
+        <!-- Add Pokemon modal -->
     <div id="add-modal" style="display:none; position:fixed; left:10%; top:10%; right:10%; bottom:10%; background:#fff; border:1px solid #ccc; padding:16px; overflow:auto; z-index:1000;">
         <button id="close-add-modal" style="float:right">Close</button>
-        <h2>Add Pokemon to Box (user: <span id="current-user">local_user</span>)</h2>
-        <div>
-            <label for="pokemon-name">Nickname / Name:</label>
-            <input id="pokemon-name" placeholder="e.g. Bath Time" />
+    <h2 id="modal-title">Add Pokemon to Box (user: <span id="current-user">local_user</span>)</h2>
+
+        <div style="margin-bottom:8px;">
+            <label for="sprite-search">Search Pokémon:</label>
+            <input id="sprite-search" placeholder="Search by name or id" style="width:220px; margin-left:8px" />
         </div>
-        <div>
-            <label for="pokemon-cp">CP (Combat Power):</label>
-            <input id="pokemon-cp" type="number" min="0" placeholder="e.g. 523" />
+
+        <p>Click a sprite to select a Pokémon. The form will prefill name and moves when available.</p>
+        <div id="sprites-list" style="display:flex;flex-wrap:wrap;gap:8px;max-height:240px;overflow:auto;border:1px solid #eee;padding:8px;"></div>
+
+        <div id="moves-selection" style="margin-top:12px;"></div>
+
+    <div id="nick-cp" style="margin-top:8px; display:none; gap:12px; align-items:center;">
+            <div>
+                <label for="pokemon-name">Nickname (optional):</label>
+                <input id="pokemon-name" placeholder="" />
+            </div>
+            <div>
+                <label for="pokemon-cp">CP (Combat Power):</label>
+                <input id="pokemon-cp" type="number" min="0" placeholder="e.g. 523" />
+            </div>
         </div>
-    <p>Click a sprite to select and add it to your Box.</p>
-        <div id="sprites-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+
+        <div style="margin-top:8px;">
+            <button id="confirm-add-btn" disabled>Add Selected</button>
+            <span id="confirm-hint" style="margin-left:8px;color:#666;font-size:0.9em">Select a sprite, choose moves, then click Add Selected.</span>
+        </div>
+
         <div id="add-message" style="color:green;margin-top:8px"></div>
     </div>
 
@@ -65,129 +90,1600 @@
         <div id="team-list">(loading...)</div>
     </section>
 
-    <script>
-        const API_BASE = 'http://127.0.0.1:5000';
-        const USER_ID = 'local_user';
+    <!-- Saved teams area -->
+    <section id="teams-section">
+        <h2>Your Teams</h2>
+        <div id="teams-list">(no teams)</div>
+    </section>
 
-        document.getElementById('add-pokemon-btn').addEventListener('click', openAddModal);
-        document.getElementById('close-add-modal').addEventListener('click', closeAddModal);
+    <!-- Team modal (create / edit teams of 3) -->
+    <div id="team-modal" style="display:none; position:fixed; left:12%; top:12%; right:12%; bottom:12%; background:#fff; border:1px solid #ccc; padding:16px; overflow:auto; z-index:1100;">
+        <button id="close-team-modal" style="float:right">Close</button>
+        <h2 id="team-modal-title">Create Team</h2>
+        <div style="margin-top:8px;">
+            <label for="team-name">Team name (optional):</label>
+            <input id="team-name" placeholder="e.g. Fire Squad" style="margin-left:8px; width:240px;" />
+        </div>
+        <p style="margin-top:8px;">Select exactly 3 Pokémon from your box to add to the team. You can rename the team later.</p>
+        <div id="team-box-list" style="margin-top:8px; max-height:320px; overflow:auto; border:1px solid #eee; padding:8px;"></div>
+        <div style="margin-top:8px;">
+            <button id="confirm-team-btn" disabled>Save Team</button>
+            <span id="team-confirm-hint" style="margin-left:8px;color:#666;font-size:0.9em">Select 3 Pokémon to enable Save.</span>
+        </div>
+        <div id="team-message" style="color:green;margin-top:8px"></div>
+    </div>
 
-        function openAddModal(e) {
-            document.getElementById('add-modal').style.display = 'block';
-            loadSprites();
+    <!-- Type Matchup Chart modal -->
+    <div id="type-chart-modal" style="display:none; position:fixed; left:6%; top:6%; right:6%; bottom:6%; background:#fff; border:1px solid #ccc; padding:12px; overflow:auto; z-index:1200;">
+        <button id="close-type-modal" style="float:right">Close</button>
+        <h2 style="margin-top:4px;">Type Matchup Chart</h2>
+        <p style="margin-top:6px; font-size:0.95em; color:#333;">Rows = Attacking type, Columns = Defending type. Values show damage multiplier.</p>
+        <div id="type-chart-container" style="margin-top:8px; overflow:auto; max-height:72vh; border:1px solid #eee; padding:8px;"></div>
+        <div style="margin-top:8px; font-size:0.9em; color:#444;">Legend: <span style="background:#e0f2e9;padding:2px 6px;border-radius:4px;margin-left:6px;">2</span> super effective &nbsp; <span style="background:#fff;padding:2px 6px;border-radius:4px;margin-left:6px;">1</span> normal &nbsp; <span style="background:#fff3e0;padding:2px 6px;border-radius:4px;margin-left:6px;">0.5</span> not very effective &nbsp; <span style="background:#f0f0f0;padding:2px 6px;border-radius:4px;margin-left:6px;">0</span> no effect</div>
+    </div>
+
+    <!-- Team analysis modal (moved outside add-modal so it can show independently) -->
+    <div id="team-analysis-modal" style="display:none; position:fixed; left:14%; top:14%; right:14%; bottom:14%; background:#fff; border:1px solid #ccc; padding:12px; overflow:auto; z-index:1250;">
+        <button id="close-team-analysis" style="float:right">Close</button>
+        <h3 style="margin-top:4px;">Team Analysis</h3>
+        <div id="team-analysis-output" style="margin-top:8px; font-size:0.95em; color:#222; max-height:68vh; overflow:auto;"></div>
+    </div>
+
+<script>
+const API_BASE = 'http://127.0.0.1:5000';
+const USER_ID = 'local_user';
+
+// Open/close modal
+// Use a wrapper so the click Event isn't passed into openAddModal (which treats objects as options)
+document.getElementById('add-pokemon-btn').addEventListener('click', () => openAddModal());
+document.getElementById('close-add-modal').addEventListener('click', closeAddModal);
+document.getElementById('confirm-add-btn').addEventListener('click', async () => {
+    if (!window.__selectedSprite) return;
+    await confirmAddSelected();
+});
+
+// toolbar buttons
+const openPokeBtn = document.getElementById('open-pokedex-btn');
+if (openPokeBtn) openPokeBtn.addEventListener('click', () => {
+    // open pokedex list in new tab (use the indexed API if available)
+    window.open(`${API_BASE}/api/v1/pokedex`, '_blank');
+});
+
+const reloadSpritesBtn = document.getElementById('reload-sprites-btn');
+if (reloadSpritesBtn) reloadSpritesBtn.addEventListener('click', () => {
+    // reload sprites in the modal if open; otherwise just re-fetch assets
+    try { loadSprites(); } catch (e) { console.warn('reload sprites failed', e); }
+});
+
+const exportBtn = document.getElementById('export-box-btn');
+if (exportBtn) exportBtn.addEventListener('click', async () => {
+    try {
+        const r = await fetch(`${API_BASE}/api/v1/box/${encodeURIComponent(USER_ID)}`);
+        if (!r.ok) throw new Error('Failed to fetch box');
+        const j = await r.json();
+        const data = j.box || [];
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${USER_ID}_box.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        alert('Export failed: ' + err.message);
+    }
+});
+
+const importInput = document.getElementById('import-box-input');
+if (importInput) importInput.addEventListener('change', async (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    try {
+        const txt = await f.text();
+        const arr = JSON.parse(txt);
+        if (!Array.isArray(arr)) throw new Error('Invalid import format; expected an array');
+        // POST each entry to the box endpoint (best-effort)
+        for (const entry of arr) {
+            await fetch(`${API_BASE}/api/v1/box/${encodeURIComponent(USER_ID)}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entry)
+            });
         }
+        alert('Import finished (best-effort). Refreshing box.');
+        loadTeam();
+    } catch (e) { alert('Import failed: ' + e.message); }
+});
 
-        function closeAddModal(e) {
-            document.getElementById('add-modal').style.display = 'none';
-            document.getElementById('add-message').textContent = '';
+const clearBtn = document.getElementById('clear-box-btn');
+if (clearBtn) clearBtn.addEventListener('click', async () => {
+    if (!confirm('Clear all entries in your box? This cannot be undone.')) return;
+    try {
+        const r = await fetch(`${API_BASE}/api/v1/box/${encodeURIComponent(USER_ID)}`);
+        if (!r.ok) throw new Error('Failed to fetch box');
+        const j = await r.json();
+        const data = j.box || [];
+        // delete from last index to first to avoid index shifting
+        for (let i = data.length - 1; i >= 0; --i) {
+            await fetch(`${API_BASE}/api/v1/box/${encodeURIComponent(USER_ID)}/${i}`, { method: 'DELETE' });
         }
+        await loadTeam();
+        try { renderTeams(); } catch (e) { /* ignore */ }
+    } catch (e) { alert('Clear failed: ' + e.message); }
+});
 
-        async function loadSprites() {
-            const listEl = document.getElementById('sprites-list');
-            listEl.innerHTML = 'Loading...';
-            try {
-                const res = await fetch(`${API_BASE}/api/v1/sprites`);
-                if (!res.ok) throw new Error('Failed to load sprites');
-                const json = await res.json();
-                listEl.innerHTML = '';
-                const sprites = json.sprites || [];
-                sprites.forEach(name => {
-                    const img = document.createElement('img');
-                    img.src = `${API_BASE}/assets/${encodeURIComponent(name)}`;
-                    img.alt = name;
-                    img.title = name;
-                    img.style.width = '64px';
-                    img.style.height = '64px';
-                    img.style.cursor = 'pointer';
-                    img.addEventListener('click', () => onSpriteClick(name));
-                    listEl.appendChild(img);
-                });
-                if (sprites.length === 0) listEl.textContent = '(no sprites found)';
-            } catch (err) {
-                listEl.textContent = 'Error loading sprites: ' + err.message;
-            }
+function openAddModal(opts = {}) {
+    // If an Event object was passed (because this function is used as an event handler), ignore it
+    if (opts && (opts instanceof Event || (typeof opts === 'object' && opts.type && opts.target))) opts = {};
+    // opts.preserve: when true, do not clear existing fields/selection (used for Edit)
+    // Only preserve when explicitly requested via opts.preserve. Do NOT infer from global state
+    // to avoid accidentally preserving stale values.
+    const preserve = !!opts.preserve;
+    document.getElementById('add-modal').style.display = 'block';
+    
+    // when not preserving, ensure we're in add mode
+    if (!preserve) window.__editingSlot = null;
+    const titleEl = document.getElementById('modal-title');
+    const confirmBtn = document.getElementById('confirm-add-btn');
+    // Set title and confirm button immediately based on preserve flag
+    if (preserve) {
+        if (titleEl) titleEl.textContent = `Edit Pokemon (user: ${document.getElementById('current-user').textContent})`;
+        if (confirmBtn) confirmBtn.textContent = 'Update';
+    } else {
+        if (titleEl) titleEl.textContent = `Add Pokemon to Box (user: ${document.getElementById('current-user').textContent})`;
+        if (confirmBtn) confirmBtn.textContent = 'Add Selected';
+    }
+    // clear fields for a fresh add unless preserving for edit
+    const nameInput = document.getElementById('pokemon-name');
+    const cpInput = document.getElementById('pokemon-cp');
+    if (!preserve) {
+        if (nameInput) { nameInput.value = ''; nameInput.placeholder = ''; }
+        if (cpInput) cpInput.value = '';
+    }
+    // clear any previous sprite selection when not preserving
+    // Do this before we decide whether to show the nickname/CP area so stale
+    // selection state doesn't cause those inputs to appear incorrectly.
+    if (!preserve) {
+        if (window.__selectedImgEl) window.__selectedImgEl.classList.remove('selected');
+        window.__selectedImgEl = null;
+        window.__selectedSprite = null;
+    }
+    // only show nickname/CP area when preserving (edit) or if a sprite is already selected
+    try {
+        const nickCpEl = document.getElementById('nick-cp');
+        if (nickCpEl) {
+            if (preserve || window.__selectedSprite) nickCpEl.style.display = 'flex';
+            else nickCpEl.style.display = 'none';
         }
-
-        async function onSpriteClick(spriteName) {
-            const nameInput = document.getElementById('pokemon-name');
-            const nickname = nameInput.value && nameInput.value.trim() ? nameInput.value.trim() : spriteName.replace(/\.png$/i, '');
-            const msgEl = document.getElementById('add-message');
-            msgEl.style.color = 'black';
-            msgEl.textContent = 'Adding...';
-            try {
-                const cpInput = document.getElementById('pokemon-cp');
-                const cpVal = cpInput && cpInput.value ? Number(cpInput.value) : null;
-
-                const res = await fetch(`${API_BASE}/api/v1/box/${encodeURIComponent(USER_ID)}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: nickname, sprite: spriteName, cp: cpVal })
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Failed to add');
-                msgEl.style.color = 'green';
-                msgEl.textContent = 'Added to box.';
-                // refresh team list
-                loadTeam();
-            } catch (err) {
-                msgEl.style.color = 'red';
-                msgEl.textContent = 'Error: ' + err.message;
-            }
+    } catch (e) { /* ignore */ }
+    // load pokedex summary once, then load sprites
+    loadPokedexMap().then(() => {
+        loadSprites();
+        // reset search box only when not preserving
+        if (!preserve) {
+            const s = document.getElementById('sprite-search');
+            if (s) s.value = '';
         }
+    });
+}
+function closeAddModal() {
+    document.getElementById('add-modal').style.display = 'none';
+    document.getElementById('add-message').textContent = '';
+    // clear selection
+    window.__selectedSprite = null;
+    if (window.__selectedImgEl) window.__selectedImgEl.classList.remove('selected');
+    window.__selectedImgEl = null;
+    document.getElementById('confirm-add-btn').disabled = true;
+    document.getElementById('moves-selection').innerHTML = '';
+    // clear edit state
+    window.__editingSlot = null;
+    // clear input fields to avoid stale values when re-opening Add
+    try {
+        const nameInput = document.getElementById('pokemon-name');
+        const cpInput = document.getElementById('pokemon-cp');
+        if (nameInput) { nameInput.value = ''; nameInput.placeholder = ''; }
+        if (cpInput) cpInput.value = '';
+    } catch (e) { /* ignore */ }
+    // hide nickname/CP area
+    try { const nickCpEl = document.getElementById('nick-cp'); if (nickCpEl) nickCpEl.style.display = 'none'; } catch (e) { }
+    // restore modal title and confirm button text
+    const titleEl = document.getElementById('modal-title');
+    if (titleEl) titleEl.textContent = `Add Pokemon to Box (user: ${document.getElementById('current-user').textContent})`;
+    const confirmBtn = document.getElementById('confirm-add-btn');
+    if (confirmBtn) confirmBtn.textContent = 'Add Selected';
+}
 
-        async function loadTeam() {
-            const el = document.getElementById('team-list');
-            el.textContent = 'Loading...';
-            try {
-                const res = await fetch(`${API_BASE}/api/v1/box/${encodeURIComponent(USER_ID)}`);
-                if (!res.ok) throw new Error('Failed to load box');
-                const json = await res.json();
-                const team = json.box || [];
-                if (team.length === 0) {
-                    el.textContent = '(empty)';
-                    return;
+// Load sprites
+async function loadSprites() {
+    const listEl = document.getElementById('sprites-list');
+    listEl.innerHTML = 'Loading...';
+    try {
+        const res = await fetch(`${API_BASE}/api/v1/sprites`);
+        if (!res.ok) throw new Error('Failed to load sprites');
+        const json = await res.json();
+        listEl.innerHTML = '';
+        const sprites = json.sprites || [];
+        sprites.forEach(name => {
+            const img = document.createElement('img');
+            img.src = `${API_BASE}/assets/${encodeURIComponent(name)}`;
+            img.alt = name;
+            img.title = name;
+            img.style.width = '64px';
+            img.style.height = '64px';
+            img.style.cursor = 'pointer';
+            img.addEventListener('click', () => onSpriteClick(name, img));
+            // if we have a pokedex map, use it to set hover name instantly
+            // Extract the leading poke id from the filename. Some filenames include a
+            // second number for alternate looks (e.g. "006-2.png"). We only want the
+            // first numeric id (strip leading zeros) so different looks map to the
+            // same pokedex entry. If no leading digits exist, try name-based match
+            // against the loaded pokedex map (useful when assets are named like
+            // 'bulbasaur.png').
+            // Find the first numeric group in the filename (this repo uses names like
+            // "pokemon_icon_025_00.png" where the first number is the dex id).
+            let foundEntry = null;
+            const firstNumMatch = name.match(/(\d+)/);
+            if (firstNumMatch) {
+                // strip leading zeros and coerce
+                const id = Number(firstNumMatch[1].replace(/^0+/, '') || firstNumMatch[1]);
+                img.dataset.dex = id;
+                if (window.__pokedexMap && window.__pokedexMap[id]) {
+                    foundEntry = window.__pokedexMap[id];
                 }
-                el.innerHTML = '';
-                team.forEach((p, idx) => {
-                    const div = document.createElement('div');
-                    div.style.display = 'flex';
-                    div.style.alignItems = 'center';
-                    div.style.gap = '8px';
-                    const img = document.createElement('img');
-                    img.src = p.sprite.startsWith('http') ? p.sprite : `${API_BASE}/assets/${encodeURIComponent(p.sprite)}`;
-                    img.style.width = '48px';
-                    img.style.height = '48px';
-                    const name = document.createElement('div');
-                    name.textContent = p.name + (p.cp !== undefined && p.cp !== null ? ` (CP ${p.cp})` : '');
-                    const btn = document.createElement('button');
-                    btn.textContent = 'Remove';
-                    btn.addEventListener('click', async () => {
-                        try {
-                            const resp = await fetch(`${API_BASE}/api/v1/box/${encodeURIComponent(USER_ID)}/${idx}`, { method: 'DELETE' });
-                            if (!resp.ok) {
-                                const d = await resp.json();
-                                throw new Error(d.error || 'Remove failed');
-                            }
-                            loadTeam();
-                        } catch (er) {
-                            alert('Error removing: ' + er.message);
-                        }
-                    });
-                    div.appendChild(img);
-                    div.appendChild(name);
-                    div.appendChild(btn);
-                    el.appendChild(div);
-                });
-            } catch (err) {
-                el.textContent = 'Error: ' + err.message;
+            } else {
+                // attempt filename -> name matching
+                const base = name.replace(/\.[^.]+$/, '');
+                const key = normalizeName(base);
+                if (window.__pokedexNameMap && window.__pokedexNameMap[key]) {
+                    foundEntry = window.__pokedexNameMap[key];
+                }
             }
+            if (foundEntry) {
+                if (foundEntry && (foundEntry.name || (foundEntry.names && foundEntry.names.English))) {
+                    img.title = foundEntry.name || (foundEntry.names && foundEntry.names.English) || img.title;
+                }
+                if (foundEntry.poke_id) img.dataset.dex = foundEntry.poke_id;
+            }
+            listEl.appendChild(img);
+        });
+        if (sprites.length === 0) listEl.textContent = '(no sprites found)';
+        // wire up search input to filter sprites by filename or pokedex name/title
+        const search = document.getElementById('sprite-search');
+        if (search) {
+            search.removeEventListener('input', spriteSearchHandler);
+            search.addEventListener('input', spriteSearchHandler);
+        }
+    } catch (err) {
+        listEl.textContent = 'Error loading sprites: ' + err.message;
+    }
+}
+
+function spriteSearchHandler(e) {
+    const q = String(e.target.value || '').toLowerCase().trim();
+    const listEl = document.getElementById('sprites-list');
+    if (!listEl) return;
+    const imgs = Array.from(listEl.querySelectorAll('img'));
+    imgs.forEach(img => {
+        const alt = (img.alt || '').toLowerCase();
+        const title = (img.title || '').toLowerCase();
+        const dex = img.dataset && img.dataset.dex ? String(img.dataset.dex) : '';
+        if (!q) {
+            img.style.display = '';
+            return;
+        }
+        if (alt.includes(q) || title.includes(q) || dex.includes(q)) {
+            img.style.display = '';
+        } else {
+            img.style.display = 'none';
+        }
+    });
+}
+
+// Fetch pokedex entry by dex id
+async function fetchPokedexById(id) {
+    try {
+        const r = await fetch(`${API_BASE}/api/v1/pokedex/${id}`);
+        if (!r.ok) return null;
+        const j = await r.json();
+        return j.pokedex || j;
+    } catch (e) { return null; }
+}
+
+// Bulk fetch pokedex list and build a map (dexId -> entry). Stored on window.__pokedexMap
+async function loadPokedexMap() {
+    if (window.__pokedexMap) return window.__pokedexMap;
+    try {
+        const r = await fetch(`${API_BASE}/api/v1/pokedex`);
+        if (!r.ok) return {};
+        const j = await r.json();
+        const list = j.pokedex || j;
+        const map = {};
+        if (Array.isArray(list)) {
+            list.forEach(entry => {
+                // prefer poke_id, but try several keys
+                const id = (entry.poke_id || entry.dexNr || entry.dex || entry.dex_nr || entry.id);
+                const idn = Number(id);
+                if (!Number.isNaN(idn)) map[idn] = entry;
+            });
+        }
+        // also build a normalized name -> entry map so we can match raw image names
+        const nameMap = {};
+        Object.values(map).forEach(e => {
+            const nm = normalizeName(e && (e.name || ((e.names && e.names.English) || '')));
+            if (nm) nameMap[nm] = e;
+        });
+        // build a global move map (moveName -> move object) so we can resolve move type/power
+        const moveMap = {};
+        try {
+            Object.values(map).forEach(e => {
+                const q = e && (e.quick_moves || e.quick || []);
+                const c = e && (e.charge_moves || e.charge || []);
+                [q, c].forEach(arr => {
+                    if (!Array.isArray(arr)) return;
+                    arr.forEach(m => {
+                        try {
+                            const key = (typeof m === 'string') ? m : (m && m.name) ? m.name : null;
+                            if (!key) return;
+                            // prefer storing the object form when available
+                            if (typeof m === 'object' && m) moveMap[key] = moveMap[key] || m;
+                            else if (!moveMap[key]) moveMap[key] = { name: key };
+                        } catch (e) { /* ignore individual move errors */ }
+                    });
+                });
+            });
+        } catch (e) { /* ignore move map build errors */ }
+        window.__pokedexMap = map;
+        window.__pokedexNameMap = nameMap;
+        window.__moveMap = moveMap;
+        return map;
+    } catch (e) {
+        window.__pokedexMap = {};
+        return window.__pokedexMap;
+    }
+}
+
+// Normalize a display name or filename to a compact lowercase token for fuzzy matching
+function normalizeName(s) {
+    if (!s) return '';
+    return String(s).toLowerCase().replace(/\.[a-z0-9]+$/i, '') // drop extension
+        .replace(/[^a-z0-9]+/g, ' ') // non-alnum -> space
+        .trim()
+        .replace(/\s+/g, ' ')
+        .replace(/\s/g, '_');
+}
+
+function prettyMoveName(n) {
+    if (!n) return n;
+    return String(n).replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+function prettyType(t) {
+    if (!t) return '';
+    return String(t).replace(/^POKEMON_TYPE_/i, '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// Produce a human-friendly label from a sprite filename or URL when no
+// pokedex entry is available. Examples:
+// '006-2.png' -> '6-2' stripped -> fallback '6 2' -> but we try to remove numeric ids
+// 'bulbasaur.png' -> 'Bulbasaur'
+// 'pokemon_icon_025_00.png' -> 'Pokemon Icon'
+function prettySpriteLabel(sprite) {
+    if (!sprite) return '(unknown)';
+    try {
+        // extract the filename portion and drop query params
+        const base = String(sprite).split('/').pop().split('?')[0] || '';
+        // strip extension
+        let name = base.replace(/\.[^.]+$/i, '');
+        // remove common numeric prefixes and suffixes like '006-', '_00', '-2', etc.
+        // remove leading numeric groups with optional separators
+        name = name.replace(/^[0-9]+[-_]?/, '');
+        // remove trailing numeric groups like _00 or -2
+        name = name.replace(/[-_][0-9]+$/,'');
+        // replace underscores and dashes with spaces
+        name = name.replace(/[-_]+/g, ' ').trim();
+        if (!name) return '(unknown)';
+        // Title-case the result
+        return name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+    } catch (e) { return sprite.replace(/\.[^.]+$/i, ''); }
+}
+
+function buildMovesSelection(pokedexEntry) {
+    const container = document.getElementById('moves-selection');
+    container.innerHTML = '';
+    if (!pokedexEntry) return;
+    const quick = pokedexEntry.quick_moves || [];
+    const charge = pokedexEntry.charge_moves || [];
+
+    if (quick.length) {
+        const label = document.createElement('label');
+        label.textContent = 'Quick move:';
+        const sel = document.createElement('select');
+        sel.name = 'quick_move';
+        quick.forEach(m => {
+            // support both object form {name,power,type} and string form 'MOVE_NAME'
+            const moveName = (typeof m === 'string') ? m : (m.name || '');
+            const movePower = (typeof m === 'object' && m && m.power) ? m.power : null;
+            const moveType = (typeof m === 'object' && m && m.type) ? m.type : null;
+            const opt = document.createElement('option');
+            opt.value = moveName;
+            opt.textContent = moveName ? `${prettyMoveName(moveName)}${moveType ? ' (' + prettyType(moveType) + ')' : ''}${movePower ? ` (${movePower})` : ''}` : moveName;
+            sel.appendChild(opt);
+        });
+        container.appendChild(label);
+        container.appendChild(sel);
+    }
+
+    if (charge.length) {
+        const label = document.createElement('label');
+        label.textContent = ' Charge move(s):';
+        const sel = document.createElement('select');
+        sel.name = 'charge_moves';
+        sel.multiple = true;
+        sel.size = Math.min(6, charge.length);
+        charge.forEach(m => {
+            const moveName = (typeof m === 'string') ? m : (m.name || '');
+            const movePower = (typeof m === 'object' && m && m.power) ? m.power : null;
+            const moveType = (typeof m === 'object' && m && m.type) ? m.type : null;
+            const opt = document.createElement('option');
+            opt.value = moveName;
+            opt.textContent = moveName ? `${prettyMoveName(moveName)}${moveType ? ' (' + prettyType(moveType) + ')' : ''}${movePower ? ` (${movePower})` : ''}` : moveName;
+            sel.appendChild(opt);
+        });
+        // enforce max 2 selection on change
+        sel.addEventListener('change', () => {
+            const vals = Array.from(sel.selectedOptions);
+            if (vals.length > 2) {
+                // deselect the last selected
+                vals[vals.length - 1].selected = false;
+                alert('You can select up to 2 charge moves');
+            }
+        });
+        container.appendChild(label);
+        container.appendChild(sel);
+
+        const hint = document.createElement('div');
+        hint.style.fontSize = '0.9em';
+        hint.style.color = '#444';
+        hint.textContent = 'Hold Ctrl (Cmd) to select multiple; choose up to 2 charge moves.';
+        container.appendChild(hint);
+    }
+}
+
+// When a sprite is clicked, select it and populate fields
+async function onSpriteClick(spriteName, imgEl) {
+    
+    // clear previous selection highlight
+    if (window.__selectedImgEl) window.__selectedImgEl.classList.remove('selected');
+    window.__selectedSprite = spriteName;
+    window.__selectedImgEl = imgEl;
+    imgEl.classList.add('selected');
+
+    // extract leading id from filename
+    // Extract the leading poke id (ignore alternate-look suffix numbers). If
+    // missing, try to match the filename to a pokedex entry by normalized name.
+    const m = spriteName.match(/(\d+)/);
+    let id = m ? Number(m[1].replace(/^0+/, '') || m[1]) : null;
+    if (id === null) {
+        const base = spriteName.replace(/\.[^.]+$/, '');
+        const key = normalizeName(base);
+        if (window.__pokedexNameMap && window.__pokedexNameMap[key] && window.__pokedexNameMap[key].poke_id) {
+            id = window.__pokedexNameMap[key].poke_id;
+        }
+    }
+
+    const nameInput = document.getElementById('pokemon-name');
+    const cpInput = document.getElementById('pokemon-cp');
+    const msgEl = document.getElementById('add-message');
+
+    // reveal nickname/CP inputs when a sprite is selected
+    try { const nickCpEl = document.getElementById('nick-cp'); if (nickCpEl) nickCpEl.style.display = 'flex'; } catch (e) { }
+
+    // For default add flow, keep nickname empty; for edit flow preserve existing nickname
+    const defaultName = spriteName.replace(/\.png$/i, '');
+    if (window.__editingSlot === null || window.__editingSlot === undefined) {
+        // not editing: clear the nickname field
+        nameInput.value = '';
+    }
+    // always update placeholder to help the user
+    nameInput.placeholder = defaultName;
+    // only clear CP when not editing — preserve CP while editing
+    if (window.__editingSlot === null || window.__editingSlot === undefined) {
+        cpInput.value = '';
+    }
+    msgEl.textContent = '';
+
+    // reset moves and disable confirm until data loaded
+    document.getElementById('moves-selection').innerHTML = '';
+    document.getElementById('confirm-add-btn').disabled = true;
+
+    if (id) {
+        
+        msgEl.style.color = 'black';
+        msgEl.textContent = 'Looking up pokedex...';
+        // prefer bulk-loaded map
+        const map = await loadPokedexMap();
+        const pok = map && map[id] ? map[id] : await fetchPokedexById(id);
+        if (pok) {
+            
+            // do NOT autofill the nickname field with the species name; keep it blank
+            // but set a helpful placeholder so user knows which species is selected
+            if (pok.name) nameInput.placeholder = pok.name;
+            buildMovesSelection(pok);
+            msgEl.textContent = 'Choose moves (1 fast, 1-2 charge) then click Add Selected.';
+            document.getElementById('confirm-add-btn').disabled = false;
+        } else {
+            // keep UI minimal when no pokedex info - do not clutter with messages
+            msgEl.textContent = '';
+            document.getElementById('confirm-add-btn').disabled = false;
+        }
+    } else {
+        
+        // no id found - allow add but don't show the 'no pokedex' message
+        msgEl.textContent = '';
+        document.getElementById('confirm-add-btn').disabled = false;
+    }
+    
+}
+
+// Confirm add: validate and POST
+async function confirmAddSelected() {
+    const spriteName = window.__selectedSprite;
+    if (!spriteName) return;
+    const nameInput = document.getElementById('pokemon-name');
+    const cpInput = document.getElementById('pokemon-cp');
+    const msgEl = document.getElementById('add-message');
+    msgEl.style.color = 'black';
+    msgEl.textContent = 'Adding...';
+
+    // If nickname is empty, send null so backend and the UI treat it as "no nickname".
+    const nickname = nameInput.value && nameInput.value.trim() ? nameInput.value.trim() : null;
+    const cpVal = cpInput && cpInput.value ? Number(cpInput.value) : null;
+
+    const quickSelect = document.querySelector('#moves-selection select[name="quick_move"]');
+    const chargeSelect = document.querySelector('#moves-selection select[name="charge_moves"]');
+    const quick_move = quickSelect ? quickSelect.value : null;
+    let charge_moves = null;
+    if (chargeSelect) {
+        charge_moves = Array.from(chargeSelect.selectedOptions).map(o => o.value).filter(Boolean);
+    }
+
+    // Client-side validation: when selectors are present, require a quick and at least one charge
+    if (quickSelect && !quick_move) {
+        msgEl.style.color = 'red';
+        msgEl.textContent = 'Please select a quick move.';
+        return;
+    }
+    if (chargeSelect && (!charge_moves || charge_moves.length < 1)) {
+        msgEl.style.color = 'red';
+        msgEl.textContent = 'Please select at least one charge move.';
+        return;
+    }
+    if (charge_moves && charge_moves.length > 2) {
+        msgEl.style.color = 'red';
+        msgEl.textContent = 'Select at most two charge moves.';
+        return;
+    }
+
+    // Require CP to be provided
+    if (cpVal === null || Number.isNaN(cpVal)) {
+        msgEl.style.color = 'red';
+        msgEl.textContent = 'Please enter the Pokémon CP (required).';
+        return;
+    }
+
+    try {
+        let res, data;
+        if (window.__editingSlot !== null && window.__editingSlot !== undefined) {
+            // update existing entry
+            res = await fetch(`${API_BASE}/api/v1/box/${encodeURIComponent(USER_ID)}/${window.__editingSlot}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: nickname, sprite: spriteName, cp: cpVal, quick_move, charge_moves })
+            });
+            data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to update');
+            msgEl.style.color = 'green';
+            msgEl.textContent = 'Updated entry.';
+            // After updating the backend, refresh box then sync teams so team members reflect edits
+            try {
+                await loadTeam();
+            } catch (e) { /* ignore */ }
+            try { updateTeamsOnEdit(window.__editingSlot); } catch (e) { /* ignore */ }
+            // close the modal after a successful edit so the user returns to their box
+            try { closeAddModal(); } catch (e) { /* ignore */ }
+        } else {
+            // create new entry
+            res = await fetch(`${API_BASE}/api/v1/box/${encodeURIComponent(USER_ID)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: nickname, sprite: spriteName, cp: cpVal, quick_move, charge_moves })
+            });
+            data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to add');
+            msgEl.style.color = 'green';
+            msgEl.textContent = 'Added to box.';
         }
 
-        // initial load
-        window.addEventListener('load', () => {
-            document.getElementById('current-user').textContent = USER_ID;
-            loadTeam();
+    // refresh team and clear selection
+    await loadTeam();
+        // deselect
+        if (window.__selectedImgEl) window.__selectedImgEl.classList.remove('selected');
+        window.__selectedSprite = null;
+        window.__selectedImgEl = null;
+        document.getElementById('confirm-add-btn').disabled = true;
+        document.getElementById('moves-selection').innerHTML = '';
+        // clear edit state
+        window.__editingSlot = null;
+    // hide nickname/CP inputs now that selection is cleared so they don't linger
+    try { const nickCpEl = document.getElementById('nick-cp'); if (nickCpEl) nickCpEl.style.display = 'none'; } catch (e) { /* ignore */ }
+    } catch (err) {
+        msgEl.style.color = 'red';
+        msgEl.textContent = 'Error: ' + err.message;
+    }
+}
+
+// Load current team
+async function loadTeam() {
+    const el = document.getElementById('team-list');
+    el.textContent = 'Loading...';
+    // Ensure pokedex map is available so we can resolve species names by id or
+    // by normalized name -> entry mapping. loadPokedexMap is idempotent.
+    try { await loadPokedexMap(); } catch (e) { /* ignore */ }
+    try {
+        const res = await fetch(`${API_BASE}/api/v1/box/${encodeURIComponent(USER_ID)}`);
+        if (!res.ok) throw new Error('Failed to load box');
+        const json = await res.json();
+        const team = json.box || [];
+        // keep a client-side copy of the box so team syncing can resolve live entries
+        try { window.__boxData = team; migrateTeamsToBoxIndices(window.__boxData); } catch (e) { window.__boxData = window.__boxData || []; }
+        if (team.length === 0) {
+            el.textContent = '(empty)';
+            return;
+        }
+        el.innerHTML = '';
+        team.forEach((p, idx) => {
+            const div = document.createElement('div');
+            div.style.display = 'flex';
+            div.style.alignItems = 'center';
+            div.style.gap = '8px';
+            const img = document.createElement('img');
+            img.src = p.sprite && p.sprite.startsWith('http') ? p.sprite : `${API_BASE}/assets/${encodeURIComponent(p.sprite)}`;
+            img.style.width = '48px';
+            img.style.height = '48px';
+            const name = document.createElement('div');
+                // Determine species name from pokedex map when available. Try several
+                // strategies: 1) extract dex id from sprite filename, 2) normalized
+                // name lookup via __pokedexNameMap, 3) fallback to cleaned sprite label.
+                let species = null;
+                try {
+                    const sprite = p.sprite || '';
+                    // 1) try to find a numeric dex id in the sprite
+                    const m = String(sprite).match(/(\d+)/);
+                    const pid = m ? Number(m[1].replace(/^0+/, '') || m[1]) : null;
+                    if (pid && window.__pokedexMap && window.__pokedexMap[pid]) {
+                        species = window.__pokedexMap[pid].name || (window.__pokedexMap[pid].names && window.__pokedexMap[pid].names.English) || null;
+                    }
+                    // 2) if not found by id, try normalized filename/name lookup
+                    if (!species) {
+                        const base = String(sprite).replace(/\.[^.]+$/, '').split('/').pop();
+                        const key = normalizeName(base);
+                        if (key && window.__pokedexNameMap && window.__pokedexNameMap[key]) {
+                            const ent = window.__pokedexNameMap[key];
+                            species = ent && (ent.name || (ent.names && ent.names.English)) || null;
+                        }
+                    }
+                } catch (e) { species = null; }
+                const nickname = p.name && String(p.name).trim() ? String(p.name).trim() : null;
+                const fallback = p.sprite ? prettySpriteLabel(p.sprite) : '(unknown)';
+                const displaySpecies = species || fallback;
+                name.textContent = displaySpecies + (p.cp !== undefined && p.cp !== null ? ` (CP ${p.cp})` : '');
+                if (nickname) {
+                    const nickSpan = document.createElement('div');
+                    nickSpan.style.fontSize = '0.9em';
+                    nickSpan.style.color = '#444';
+                    nickSpan.textContent = `Nickname: ${nickname}`;
+                    name.appendChild(nickSpan);
+                }
+                // Show moves (quick and charge) when available
+                const movesDiv = document.createElement('div');
+                movesDiv.style.fontSize = '0.9em';
+                movesDiv.style.color = '#222';
+                const qm = p.quick_move || null;
+                const cms = p.charge_moves || p.charge_move || [];
+                const chargeList = Array.isArray(cms) ? cms : (cms ? [cms] : []);
+                const parts = [];
+                // try to resolve move type and power using pokedex data for this species
+                try {
+                    let pok = null;
+                    try {
+                        const sprite = p.sprite || '';
+                        const m = String(sprite).match(/(\d+)/);
+                        const pid = m ? Number(m[1].replace(/^0+/, '') || m[1]) : null;
+                        if (pid && window.__pokedexMap && window.__pokedexMap[pid]) pok = window.__pokedexMap[pid];
+                        if (!pok) {
+                            const base = String(sprite).replace(/\.[^.]+$/, '').split('/').pop();
+                            const key = normalizeName(base);
+                            if (key && window.__pokedexNameMap && window.__pokedexNameMap[key]) pok = window.__pokedexNameMap[key];
+                        }
+                    } catch (e) { pok = null; }
+
+                    if (qm) {
+                        let qtxt = prettyMoveName(qm);
+                        let qp = null; let qt = '';
+                        if (pok && pok.quick_moves && pok.quick_moves.length) {
+                            const found = pok.quick_moves.find(x => ((typeof x === 'string') ? x : (x.name || '')) === qm);
+                            if (found && typeof found === 'object') {
+                                qp = found.power || found.power_mean || found.damage || null;
+                                qt = found.type ? prettyType(found.type) : '';
+                            }
+                        }
+                        parts.push(`Quick: ${qtxt}${qt ? ' (' + qt + ')' : ''}${qp ? ` (${qp})` : ''}`);
+                    }
+
+                    if (chargeList && chargeList.length) {
+                        const cs = chargeList.map(c => {
+                            const cname = prettyMoveName(c);
+                            let cpower = null; let ctype = '';
+                            if (pok && pok.charge_moves && pok.charge_moves.length) {
+                                const found = pok.charge_moves.find(x => ((typeof x === 'string') ? x : (x.name || '')) === c);
+                                if (found && typeof found === 'object') {
+                                    cpower = found.power || found.power_mean || found.damage || null;
+                                    ctype = found.type ? prettyType(found.type) : '';
+                                }
+                            }
+                            return `${cname}${ctype ? ' (' + ctype + ')' : ''}${cpower ? ` (${cpower})` : ''}`;
+                        });
+                        if (cs.length) parts.push(`Charge: ${cs.join(', ')}`);
+                    }
+                } catch (e) {
+                    // fallback: try global move map (window.__moveMap) so we can still show type/power
+                    try {
+                        if (qm) {
+                            let mt = '';
+                            let mp = null;
+                            const mm = (window.__moveMap && window.__moveMap[qm]) ? window.__moveMap[qm] : null;
+                            if (mm) { mt = mm.type ? prettyType(mm.type) : ''; mp = mm.power || mm.power_mean || mm.damage || null; }
+                            parts.push(`Quick: ${prettyMoveName(qm)}${mt ? ' (' + mt + ')' : ''}${mp ? ` (${mp})` : ''}`);
+                        }
+                        if (chargeList && chargeList.length) {
+                            const cs = chargeList.map(cn => {
+                                const mm = (window.__moveMap && window.__moveMap[cn]) ? window.__moveMap[cn] : null;
+                                const mtype = mm && mm.type ? prettyType(mm.type) : '';
+                                const mpow = mm && (mm.power || mm.power_mean || mm.damage) ? (mm.power || mm.power_mean || mm.damage) : null;
+                                return `${prettyMoveName(cn)}${mtype ? ' (' + mtype + ')' : ''}${mpow ? ` (${mpow})` : ''}`;
+                            });
+                            parts.push(`Charge: ${cs.join(', ')}`);
+                        }
+                    } catch (e2) {
+                        if (qm) parts.push(`Quick: ${prettyMoveName(qm)}`);
+                        if (chargeList && chargeList.length) parts.push(`Charge: ${chargeList.map(c => prettyMoveName(c)).join(', ')}`);
+                    }
+                }
+                if (parts.length) movesDiv.textContent = parts.join(' • ');
+                if (parts.length) name.appendChild(movesDiv);
+            const btn = document.createElement('button');
+            btn.textContent = 'Remove';
+            btn.addEventListener('click', async () => {
+                try {
+                    const resp = await fetch(`${API_BASE}/api/v1/box/${encodeURIComponent(USER_ID)}/${idx}`, { method: 'DELETE' });
+                    if (!resp.ok) {
+                        const d = await resp.json();
+                        throw new Error(d.error || 'Remove failed');
+                    }
+                    // sync teams (remove or shift members referencing this slot)
+                    try { updateTeamsOnDelete(idx); } catch (e) { /* ignore */ }
+                            await loadTeam();
+                            try { renderTeams(); } catch (e) { /* ignore */ }
+                } catch (er) {
+                    alert('Error removing: ' + er.message);
+                }
+            });
+            const editBtn = document.createElement('button');
+            editBtn.textContent = 'Edit';
+            editBtn.addEventListener('click', async () => {
+                openEditModal(idx, p);
+            });
+            div.appendChild(img);
+            div.appendChild(name);
+            div.appendChild(btn);
+            div.appendChild(editBtn);
+            el.appendChild(div);
         });
-    </script>
+    } catch (err) {
+        el.textContent = 'Error: ' + err.message;
+    }
+}
+
+// Open edit modal for an existing box entry at `slot` with payload `entry`
+async function openEditModal(slot, entry) {
+    // set editing slot first, then open the same add modal in preserve mode so fields aren't cleared
+    window.__editingSlot = slot;
+    openAddModal({ preserve: true });
+    // switch UI into edit mode (title and confirm button)
+    const titleEl = document.getElementById('modal-title');
+    if (titleEl) titleEl.textContent = `Edit Pokemon (user: ${document.getElementById('current-user').textContent})`;
+    const confirmBtn = document.getElementById('confirm-add-btn');
+    if (confirmBtn) confirmBtn.textContent = 'Update';
+    // wait for sprites to be loaded (loadSprites is called by openAddModal)
+    // set selected sprite visually when available
+    const waitForSprites = () => new Promise(resolve => {
+        const tries = 20;
+        let attempt = 0;
+        const iv = setInterval(() => {
+            const list = document.getElementById('sprites-list');
+            if (list && list.querySelectorAll('img').length > 0) {
+                clearInterval(iv);
+                resolve();
+            }
+            attempt++;
+            if (attempt > tries) { clearInterval(iv); resolve(); }
+        }, 100);
+    });
+    await waitForSprites();
+
+    // try to find the sprite image element and select it
+    const listEl = document.getElementById('sprites-list');
+    const imgs = Array.from(listEl.querySelectorAll('img'));
+    let matched = null;
+    // Build several candidate keys from the stored entry.sprite and species info
+    const raw = entry && entry.sprite ? String(entry.sprite) : '';
+    const base = raw.split('/').pop().split('?')[0] || '';
+    const decodedBase = decodeURIComponent(base || '') || '';
+    const candidates = new Set();
+    if (raw) candidates.add(raw);
+    if (base) candidates.add(base);
+    if (decodedBase) candidates.add(decodedBase);
+    // also try without extension and normalized forms
+    if (base) candidates.add(base.replace(/\.[^.]+$/, ''));
+    if (decodedBase) candidates.add(decodedBase.replace(/\.[^.]+$/, ''));
+    // gather possible poke id from sprite or entry fields
+    let pid = null;
+    try {
+        const m = raw.match(/(\d+)/);
+        if (m) pid = Number(m[1].replace(/^0+/, '') || m[1]);
+    } catch (e) { pid = null; }
+    // if entry has a species or name, add normalized form
+    if (entry && (entry.species_name || entry.species || entry.speciesName)) {
+        candidates.add(normalizeName(entry.species_name || entry.species || entry.speciesName));
+    }
+    if (entry && entry.name) candidates.add(normalizeName(entry.name));
+
+    // Helper to normalize img keys
+    const imgKey = im => {
+        try {
+            const alt = String(im.alt || '').split('/').pop().split('?')[0];
+            return normalizeName(alt.replace(/\.[^.]+$/, ''));
+        } catch (e) { return ''; }
+    };
+
+    // 1) exact alt match or src contains candidate
+    for (const im of imgs) {
+        try {
+            if (candidates.has(im.alt)) { matched = im; break; }
+            if (base && im.alt === base) { matched = im; break; }
+            if (im.src && base && im.src.indexOf(base) !== -1) { matched = im; break; }
+            // try constructed asset URL (common case when entry.sprite is just a filename or full URL)
+            try {
+                const candidateUrl = `${API_BASE}/assets/${encodeURIComponent(base)}`;
+                const candidateUrlDecoded = `${API_BASE}/assets/${encodeURIComponent(decodedBase)}`;
+                if (im.src === candidateUrl || im.src === candidateUrlDecoded) { matched = im; break; }
+            } catch (e) { /* ignore */ }
+        } catch (e) { /* ignore */ }
+    }
+    // 2) match by dataset dex id
+    if (!matched && pid) {
+        for (const im of imgs) {
+            try {
+                if (im.dataset && im.dataset.dex && Number(im.dataset.dex) === pid) { matched = im; break; }
+            } catch (e) { }
+        }
+    }
+    // 3) try normalized name matching against alt/title
+    if (!matched) {
+        const normCandidates = Array.from(candidates).map(c => normalizeName(c));
+        for (const im of imgs) {
+            try {
+                const k = imgKey(im);
+                if (!k) continue;
+                for (const nc of normCandidates) {
+                    if (nc && k && (k === nc || k.indexOf(nc) !== -1 || nc.indexOf(k) !== -1)) { matched = im; break; }
+                }
+                if (matched) break;
+            } catch (e) { /* ignore */ }
+        }
+    }
+    
+    if (matched) {
+        // trigger the same selection logic as clicking (use the matched image's alt as the sprite name)
+        const spriteToUse = matched.alt || entry.sprite;
+        // await to ensure selection logic completes before we set other fields
+        await onSpriteClick(spriteToUse, matched);
+        try { matched.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { }
+    } else {
+        // if sprite not in assets (maybe external), set fields directly
+        window.__selectedSprite = entry.sprite;
+        document.getElementById('confirm-add-btn').disabled = false;
+        // ensure nickname/CP area is visible for editing entries even when sprite asset isn't available
+        try { const nickCpEl = document.getElementById('nick-cp'); if (nickCpEl) nickCpEl.style.display = 'flex'; } catch (e) { }
+    }
+
+    // populate name and cp
+    const nameInput = document.getElementById('pokemon-name');
+    const cpInput = document.getElementById('pokemon-cp');
+    
+    if (nameInput) nameInput.value = entry.name || '';
+    if (cpInput) cpInput.value = entry.cp || '';
+    
+
+    // when pokedex load finishes, pre-select moves
+    const map = await loadPokedexMap();
+    // If we didn't find a matched asset image, try to locate pokedex info from the entry
+    if (!matched) {
+        try {
+            // attempt to extract dex id from the stored sprite value
+            const raw = entry && entry.sprite ? String(entry.sprite) : '';
+            const m = raw.match(/(\d+)/);
+            let pid = m ? Number(m[1].replace(/^0+/, '') || m[1]) : null;
+            if (!pid) {
+                // try name-based lookup
+                const base = raw.replace(/\.[^.]+$/, '').split('/').pop();
+                const key = normalizeName(base);
+                if (window.__pokedexNameMap && window.__pokedexNameMap[key] && window.__pokedexNameMap[key].poke_id) {
+                    pid = window.__pokedexNameMap[key].poke_id;
+                }
+            }
+            let pok = null;
+            if (pid && map && map[pid]) pok = map[pid];
+            if (!pok && pid) pok = await fetchPokedexById(pid);
+            if (!pok && entry && entry.species_name) pok = entry.species_name; // fallback
+            if (pok && typeof pok === 'object') {
+                // set helpful placeholder and build moves UI so the editor can see moves
+                if (pok.name) nameInput.placeholder = pok.name;
+                buildMovesSelection(pok);
+            }
+        } catch (e) { /* ignore */ }
+    }
+    // pre-select quick and charge moves if selectors present
+    setTimeout(() => {
+        // Only apply these changes if we're still editing the same slot
+        if (window.__editingSlot !== slot) return;
+        const quickSelect = document.querySelector('#moves-selection select[name="quick_move"]');
+        const chargeSelect = document.querySelector('#moves-selection select[name="charge_moves"]');
+        if (quickSelect && entry.quick_move) {
+            Array.from(quickSelect.options).forEach(o => { if (o.value === entry.quick_move) o.selected = true; });
+        }
+        if (chargeSelect && entry.charge_moves) {
+            Array.from(chargeSelect.options).forEach(o => { if ((entry.charge_moves || []).includes(o.value)) o.selected = true; });
+        }
+        // ensure modal indicates edit mode and confirm button shows Update
+        const titleEl = document.getElementById('modal-title');
+        if (titleEl) titleEl.textContent = `Edit Pokemon (user: ${document.getElementById('current-user').textContent})`;
+        const confirmBtn = document.getElementById('confirm-add-btn');
+        if (confirmBtn) confirmBtn.textContent = 'Update';
+    }, 150);
+}
+
+// initial load
+window.addEventListener('load', () => {
+    document.getElementById('current-user').textContent = USER_ID;
+    loadTeam();
+});
+
+// --- Teams management (client-side, stored in localStorage) ---
+function teamsStorageKey() {
+    return `teams_${USER_ID}`;
+}
+function getTeamsFromStorage() {
+    try {
+        const s = localStorage.getItem(teamsStorageKey());
+        if (!s) return [];
+        return JSON.parse(s) || [];
+    } catch (e) { return []; }
+}
+function saveTeamsToStorage(arr) {
+    try { localStorage.setItem(teamsStorageKey(), JSON.stringify(arr || [])); } catch (e) { /* ignore */ }
+}
+
+function getDisplaySpeciesFromEntry(p) {
+    try {
+        const sprite = p.sprite || '';
+        const m = String(sprite).match(/(\d+)/);
+        const pid = m ? Number(m[1].replace(/^0+/, '') || m[1]) : null;
+        if (pid && window.__pokedexMap && window.__pokedexMap[pid]) return window.__pokedexMap[pid].name || (window.__pokedexMap[pid].names && window.__pokedexMap[pid].names.English) || prettySpriteLabel(sprite);
+        const base = String(sprite).replace(/\.[^.]+$/, '').split('/').pop();
+        const key = normalizeName(base);
+        if (key && window.__pokedexNameMap && window.__pokedexNameMap[key]) {
+            const ent = window.__pokedexNameMap[key];
+            return ent && (ent.name || (ent.names && ent.names.English)) || prettySpriteLabel(sprite);
+        }
+        return prettySpriteLabel(sprite);
+    } catch (e) { return prettySpriteLabel(p.sprite); }
+}
+
+function renderTeams() {
+    const el = document.getElementById('teams-list');
+    const teams = getTeamsFromStorage();
+    if (!el) return;
+    if (!teams || teams.length === 0) { el.textContent = '(no teams)'; return; }
+    el.innerHTML = '';
+    teams.forEach((t, idx) => {
+        const d = document.createElement('div');
+        d.style.border = '1px solid #ddd';
+        d.style.padding = '8px';
+        d.style.marginBottom = '8px';
+        const h = document.createElement('div');
+        h.style.display = 'flex';
+        h.style.justifyContent = 'space-between';
+        const title = document.createElement('div');
+        title.textContent = t.name || `Team ${idx + 1}`;
+        title.style.fontWeight = '600';
+        h.appendChild(title);
+    const actions = document.createElement('div');
+    const editBtn = document.createElement('button'); editBtn.textContent = 'Edit'; editBtn.addEventListener('click', () => openEditTeam(idx));
+    const delBtn = document.createElement('button'); delBtn.textContent = 'Delete'; delBtn.style.marginLeft = '8px'; delBtn.addEventListener('click', () => { if (confirm('Delete this team?')) deleteTeam(idx); });
+    const analyzeBtn = document.createElement('button'); analyzeBtn.textContent = 'Analyze'; analyzeBtn.style.marginLeft = '8px'; analyzeBtn.addEventListener('click', () => analyzeTeam(idx));
+    actions.appendChild(editBtn); actions.appendChild(delBtn); actions.appendChild(analyzeBtn);
+        h.appendChild(actions);
+        d.appendChild(h);
+
+        const members = document.createElement('div');
+        members.style.display = 'flex';
+        members.style.gap = '6px';
+        members.style.marginTop = '8px';
+        members.style.alignItems = 'center';
+        members.style.flexWrap = 'nowrap';
+        members.style.overflow = 'hidden';
+        (t.members || []).forEach(mi => {
+            try {
+                // If the member was saved with a _boxIndex, prefer the live box data
+                const finalMember = (mi && typeof mi._boxIndex === 'number' && window.__boxData && window.__boxData[mi._boxIndex]) ? window.__boxData[mi._boxIndex] : mi;
+                const sprite = finalMember.sprite || '';
+                const col = document.createElement('div');
+                col.style.display = 'flex'; col.style.flexDirection = 'column'; col.style.alignItems = 'center'; col.style.width = '56px';
+                col.style.flex = '0 0 56px';
+                const cpEl = document.createElement('div'); cpEl.style.fontSize='0.85em'; cpEl.style.color='#444'; cpEl.style.marginBottom='4px'; cpEl.textContent = (finalMember.cp !== undefined && finalMember.cp !== null) ? `CP ${finalMember.cp}` : '';
+                const img = document.createElement('img');
+                img.src = sprite && sprite.startsWith('http') ? sprite : `${API_BASE}/assets/${encodeURIComponent(sprite)}`;
+                img.style.width = '40px'; img.style.height = '40px'; img.style.objectFit = 'cover';
+                img.title = getDisplaySpeciesFromEntry(finalMember);
+                const nick = document.createElement('div'); nick.style.fontSize='0.8em'; nick.style.color='#333'; nick.style.marginTop='4px'; nick.style.maxWidth='56px'; nick.style.whiteSpace='nowrap'; nick.style.overflow='hidden'; nick.style.textOverflow='ellipsis'; nick.textContent = (finalMember.name && String(finalMember.name).trim()) ? String(finalMember.name).trim() : '';
+                col.appendChild(cpEl); col.appendChild(img); col.appendChild(nick);
+                members.appendChild(col);
+            } catch (e) { /* ignore member */ }
+        });
+        d.appendChild(members);
+        el.appendChild(d);
+    });
+}
+
+async function openTeamModal(opts = {}) {
+    const editIndex = (typeof opts.editIndex === 'number') ? opts.editIndex : null;
+    window.__editingTeamIndex = editIndex;
+    document.getElementById('team-modal').style.display = 'block';
+    const title = document.getElementById('team-modal-title');
+    const nameInput = document.getElementById('team-name');
+    document.getElementById('team-message').textContent = '';
+    if (editIndex !== null) {
+        const teams = getTeamsFromStorage();
+        const t = teams[editIndex] || { name: '', members: [] };
+        if (title) title.textContent = 'Edit Team';
+        if (nameInput) nameInput.value = t.name || '';
+    } else {
+        if (title) title.textContent = 'Create Team';
+        if (nameInput) nameInput.value = '';
+    }
+    // ensure we have the current box data and pokedex map
+    try { await loadPokedexMap(); } catch (e) { /* ignore */ }
+    try {
+        const r = await fetch(`${API_BASE}/api/v1/box/${encodeURIComponent(USER_ID)}`);
+        if (r.ok) {
+            const j = await r.json();
+            window.__boxData = j.box || [];
+            try { migrateTeamsToBoxIndices(window.__boxData); } catch (e) { /* ignore migration errors */ }
+        } else {
+            window.__boxData = window.__boxData || [];
+        }
+    } catch (e) { window.__boxData = window.__boxData || []; }
+    buildTeamBoxList(editIndex);
+    onTeamBoxSelectionChange();
+}
+
+function closeTeamModal() {
+    document.getElementById('team-modal').style.display = 'none';
+    document.getElementById('team-message').textContent = '';
+    window.__editingTeamIndex = null;
+}
+
+function buildTeamBoxList(editIndex) {
+    const container = document.getElementById('team-box-list');
+    container.innerHTML = '';
+    const box = window.__boxData || [];
+    const teams = getTeamsFromStorage();
+    const preselected = (editIndex !== null && teams[editIndex]) ? teams[editIndex].members || [] : [];
+    box.forEach((p, idx) => {
+        const wrap = document.createElement('div');
+        wrap.style.display = 'flex'; wrap.style.alignItems = 'center'; wrap.style.gap = '8px'; wrap.style.marginBottom = '6px';
+        const cb = document.createElement('input'); cb.type = 'checkbox'; cb.dataset.boxIndex = idx;
+        try {
+            // support members saved with _boxIndex (preferred) or legacy sprite/name matching
+            const match = preselected.find(m => ((typeof m._boxIndex === 'number' && m._boxIndex === idx) || ((m.sprite === p.sprite) && String((m.name||'')).trim() === String((p.name||'')).trim())));
+            if (match) cb.checked = true;
+        } catch (e) { }
+        cb.addEventListener('change', onTeamBoxSelectionChange);
+        const col = document.createElement('div');
+        col.style.display = 'flex'; col.style.flexDirection = 'column'; col.style.alignItems = 'center'; col.style.width = '72px';
+        const cpEl = document.createElement('div'); cpEl.style.fontSize='0.9em'; cpEl.style.color='#444'; cpEl.style.marginBottom='4px'; cpEl.textContent = (p.cp !== undefined && p.cp !== null) ? `CP ${p.cp}` : '';
+        const img = document.createElement('img'); img.src = p.sprite && p.sprite.startsWith('http') ? p.sprite : `${API_BASE}/assets/${encodeURIComponent(p.sprite)}`; img.style.width = '40px'; img.style.height = '40px';
+        const nick = document.createElement('div'); nick.style.fontSize='0.85em'; nick.style.color='#666'; nick.style.marginTop='4px'; nick.textContent = (p.name && String(p.name).trim()) ? String(p.name).trim() : '';
+        col.appendChild(cpEl); col.appendChild(img); col.appendChild(nick);
+        const lbl = document.createElement('div'); lbl.style.fontSize = '0.95em'; lbl.textContent = getDisplaySpeciesFromEntry(p);
+        // try to find pokedex entry to show types and moves
+        try {
+            let pok = null;
+            const sprite = p.sprite || '';
+            const m = String(sprite).match(/(\d+)/);
+            const pid = m ? Number(m[1].replace(/^0+/, '') || m[1]) : null;
+            if (pid && window.__pokedexMap && window.__pokedexMap[pid]) pok = window.__pokedexMap[pid];
+            if (!pok) {
+                const base = String(sprite).replace(/\.[^.]+$/, '').split('/').pop();
+                const key = normalizeName(base);
+                if (key && window.__pokedexNameMap && window.__pokedexNameMap[key]) pok = window.__pokedexNameMap[key];
+            }
+            if (pok) {
+                // types
+                const types = pok.types || pok.type || pok.pokemon_type || null;
+                if (types) {
+                    const typesDiv = document.createElement('div');
+                    typesDiv.style.fontSize = '0.85em'; typesDiv.style.color = '#666'; typesDiv.style.marginTop = '6px';
+                    let ttxt = '';
+                    if (Array.isArray(types)) ttxt = types.map(prettyType).join(' • ');
+                    else ttxt = prettyType(types);
+                    typesDiv.textContent = `Type: ${ttxt}`;
+                    lbl.appendChild(typesDiv);
+                }
+                // moves: show only the moves the user picked for this box entry
+                // (p.quick_move and p.charge_moves). Resolve type/power from the
+                // pokedex entry when possible, otherwise consult the global move map.
+                const selectedQuick = p.quick_move || null;
+                const selectedCharges = p.charge_moves || p.charge_move || [];
+                const movesDiv = document.createElement('div');
+                movesDiv.style.fontSize = '0.85em'; movesDiv.style.color = '#333'; movesDiv.style.marginTop = '6px';
+                const parts = [];
+                if (selectedQuick) {
+                    let qtype = '';
+                    let qpower = null;
+                    try {
+                        // try species-level info first
+                        if (pok && (pok.quick_moves || pok.quick)) {
+                            const qlist = pok.quick_moves || pok.quick || [];
+                            const found = (Array.isArray(qlist) ? qlist : [qlist]).find(x => ((typeof x === 'string') ? x : (x && x.name)) === selectedQuick);
+                            if (found && typeof found === 'object') { qtype = found.type ? prettyType(found.type) : ''; qpower = found.power || found.power_mean || found.damage || null; }
+                        }
+                    } catch (e) { /* ignore species-level lookup errors */ }
+                    // fallback to global move map
+                    if ((!qtype || qtype === '') && window.__moveMap && window.__moveMap[selectedQuick]) {
+                        const mm = window.__moveMap[selectedQuick];
+                        if (mm) { qtype = mm.type ? prettyType(mm.type) : ''; qpower = qpower || (mm.power || mm.power_mean || mm.damage || null); }
+                    }
+                    parts.push(`Quick: ${prettyMoveName(selectedQuick)}${qtype ? ' (' + qtype + ')' : ''}${qpower ? ` (${qpower})` : ''}`);
+                }
+
+                if (selectedCharges && (Array.isArray(selectedCharges) ? selectedCharges.length : selectedCharges ? 1 : 0)) {
+                    const chargeArray = Array.isArray(selectedCharges) ? selectedCharges : [selectedCharges];
+                    const cs = chargeArray.map(cm => {
+                        let ctype = '';
+                        let cpower = null;
+                        try {
+                            if (pok && (pok.charge_moves || pok.charge)) {
+                                const clist = pok.charge_moves || pok.charge || [];
+                                const found = (Array.isArray(clist) ? clist : [clist]).find(x => ((typeof x === 'string') ? x : (x && x.name)) === cm);
+                                if (found && typeof found === 'object') { ctype = found.type ? prettyType(found.type) : ''; cpower = found.power || found.power_mean || found.damage || null; }
+                            }
+                        } catch (e) { /* ignore */ }
+                        if ((!ctype || ctype === '') && window.__moveMap && window.__moveMap[cm]) {
+                            const mm = window.__moveMap[cm];
+                            if (mm) { ctype = mm.type ? prettyType(mm.type) : ''; cpower = cpower || (mm.power || mm.power_mean || mm.damage || null); }
+                        }
+                        return `${prettyMoveName(cm)}${ctype ? ' (' + ctype + ')' : ''}${cpower ? ` (${cpower})` : ''}`;
+                    });
+                    if (cs.length) parts.push(`Charge: ${cs.join(', ')}`);
+                }
+
+                if (parts.length) {
+                    movesDiv.textContent = parts.join(' • ');
+                    lbl.appendChild(movesDiv);
+                }
+            }
+        } catch (e) { /* ignore pokedex display errors */ }
+        wrap.appendChild(cb); wrap.appendChild(col); wrap.appendChild(lbl);
+        container.appendChild(wrap);
+    });
+}
+
+function onTeamBoxSelectionChange() {
+    const container = document.getElementById('team-box-list');
+    if (!container) return;
+    const checks = Array.from(container.querySelectorAll('input[type="checkbox"]'));
+    const selected = checks.filter(c => c.checked);
+    const confirmBtn = document.getElementById('confirm-team-btn');
+    if (confirmBtn) confirmBtn.disabled = !(selected.length === 3);
+}
+
+// --- Team sync helpers ---
+function updateTeamsOnEdit(boxIndex) {
+    try {
+        const teams = getTeamsFromStorage();
+        if (!Array.isArray(teams) || teams.length === 0) return;
+        // get latest box entry if available
+        const latest = (window.__boxData && window.__boxData[boxIndex]) ? window.__boxData[boxIndex] : null;
+        for (let ti = 0; ti < teams.length; ti++) {
+            const t = teams[ti];
+            let changed = false;
+            t.members = (t.members || []).map(m => {
+                if (m && typeof m._boxIndex === 'number' && m._boxIndex === boxIndex) {
+                    changed = true;
+                    // replace stored member with up-to-date copy (preserve _boxIndex)
+                    return Object.assign({}, latest || m, { _boxIndex: boxIndex });
+                }
+                return m;
+            });
+            if (changed) teams[ti] = t;
+        }
+        saveTeamsToStorage(teams);
+        renderTeams();
+    } catch (e) { console.warn('updateTeamsOnEdit failed', e); }
+}
+
+function updateTeamsOnDelete(deletedIndex) {
+    try {
+        const teams = getTeamsFromStorage();
+        if (!Array.isArray(teams) || teams.length === 0) return;
+        let changedAny = false;
+        teams.forEach((t) => {
+            const newMembers = [];
+            (t.members || []).forEach(m => {
+                if (m && typeof m._boxIndex === 'number') {
+                    if (m._boxIndex === deletedIndex) {
+                        // remove this member from the team
+                        changedAny = true;
+                        return; // skip
+                    }
+                    // shift indexes greater than deletedIndex
+                    const shifted = (m._boxIndex > deletedIndex) ? Object.assign({}, m, { _boxIndex: m._boxIndex - 1 }) : m;
+                    newMembers.push(shifted);
+                } else {
+                    // legacy member (no index) - try to keep it but we can't map it reliably
+                    newMembers.push(m);
+                }
+            });
+            if (newMembers.length !== (t.members || []).length) changedAny = true;
+            t.members = newMembers;
+        });
+        if (changedAny) {
+            saveTeamsToStorage(teams);
+            renderTeams();
+        }
+    } catch (e) { console.warn('updateTeamsOnDelete failed', e); }
+}
+
+// Best-effort migration: if teams were saved before we started storing _boxIndex,
+// try to match legacy members to current box entries by sprite & name and add
+// a _boxIndex so future edits/deletes will keep teams in sync.
+function migrateTeamsToBoxIndices(boxData) {
+    try {
+        if (!Array.isArray(boxData)) boxData = boxData || [];
+        const teams = getTeamsFromStorage();
+        if (!Array.isArray(teams) || teams.length === 0) return;
+        let changed = false;
+        teams.forEach((t, ti) => {
+            const members = (t.members || []).map(m => {
+                if (!m || typeof m !== 'object') return m;
+                // already migrated
+                if (typeof m._boxIndex === 'number') return m;
+                // try to find an index in boxData that matches sprite and name
+                const matchIdx = boxData.findIndex(b => {
+                    try {
+                        const sameSprite = (b.sprite === m.sprite);
+                        const sameName = String((b.name||'')).trim() === String((m.name||'')).trim();
+                        return sameSprite && sameName;
+                    } catch (e) { return false; }
+                });
+                if (matchIdx !== -1) {
+                    changed = true;
+                    return Object.assign({}, m, { _boxIndex: matchIdx });
+                }
+                return m;
+            });
+            t.members = members;
+            teams[ti] = t;
+        });
+        if (changed) {
+            saveTeamsToStorage(teams);
+            // don't re-render globally here (caller may), but try to update UI if visible
+            try { renderTeams(); } catch (e) { /* ignore */ }
+        }
+    } catch (e) { console.warn('migrateTeamsToBoxIndices failed', e); }
+}
+
+// Return a canonical type-effectiveness mapping (attacker -> defender -> multiplier)
+function getTypeEffectiveness() {
+    return {
+        NORMAL: { ROCK:0.5, GHOST:0, STEEL:0.5 },
+        FIRE: { GRASS:2, ICE:2, BUG:2, STEEL:2, FIRE:0.5, WATER:0.5, ROCK:0.5, DRAGON:0.5 },
+        WATER: { FIRE:2, GROUND:2, ROCK:2, WATER:0.5, GRASS:0.5, DRAGON:0.5 },
+        ELECTRIC: { WATER:2, FLYING:2, ELECTRIC:0.5, GRASS:0.5, DRAGON:0.5, GROUND:0 },
+        GRASS: { WATER:2, GROUND:2, ROCK:2, FIRE:0.5, GRASS:0.5, POISON:0.5, FLYING:0.5, BUG:0.5, DRAGON:0.5, STEEL:0.5 },
+        ICE: { GRASS:2, GROUND:2, FLYING:2, DRAGON:2, FIRE:0.5, WATER:0.5, ICE:0.5, STEEL:0.5 },
+        FIGHTING: { NORMAL:2, ICE:2, ROCK:2, DARK:2, STEEL:2, POISON:0.5, FLYING:0.5, PSYCHIC:0.5, BUG:0.5, FAIRY:0.5 },
+        POISON: { GRASS:2, FAIRY:2, POISON:0.5, GROUND:0.5, ROCK:0.5, GHOST:0.5, STEEL:0 },
+        GROUND: { FIRE:2, ELECTRIC:2, POISON:2, ROCK:2, STEEL:2, GRASS:0.5, BUG:0.5, FLYING:0 },
+        FLYING: { GRASS:2, FIGHTING:2, BUG:2, ELECTRIC:0.5, ROCK:0.5, STEEL:0.5 },
+        PSYCHIC: { FIGHTING:2, POISON:2, PSYCHIC:0.5, STEEL:0.5, DARK:0 },
+        BUG: { GRASS:2, PSYCHIC:2, DARK:2, FIRE:0.5, FIGHTING:0.5, POISON:0.5, FLYING:0.5, GHOST:0.5, STEEL:0.5, FAIRY:0.5 },
+        ROCK: { FIRE:2, ICE:2, FLYING:2, BUG:2, FIGHTING:0.5, GROUND:0.5, STEEL:0.5 },
+        GHOST: { PSYCHIC:2, GHOST:2, NORMAL:0, DARK:0.5 },
+        DRAGON: { DRAGON:2, STEEL:0.5, FAIRY:0 },
+        DARK: { PSYCHIC:2, GHOST:2, FIGHTING:0.5, DARK:0.5, FAIRY:0.5 },
+        STEEL: { ICE:2, ROCK:2, FAIRY:2, FIRE:0.5, WATER:0.5, ELECTRIC:0.5, STEEL:0.5 },
+        FAIRY: { FIGHTING:2, DRAGON:2, DARK:2, FIRE:0.5, POISON:0.5, STEEL:0.5 }
+    };
+}
+
+// --- Type Matchup Chart ---
+function renderTypeChart() {
+    const container = document.getElementById('type-chart-container');
+    if (!container) return;
+    container.innerHTML = '';
+    const types = [
+        'NORMAL','FIRE','WATER','ELECTRIC','GRASS','ICE','FIGHTING','POISON','GROUND','FLYING','PSYCHIC','BUG','ROCK','GHOST','DRAGON','DARK','STEEL','FAIRY'
+    ];
+    const eff = getTypeEffectiveness();
+
+    // Build table
+    const table = document.createElement('table');
+    table.style.borderCollapse = 'collapse';
+    table.style.fontSize = '12px';
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    headerRow.appendChild(document.createElement('th')); // corner
+    types.forEach(t => {
+        const th = document.createElement('th');
+        th.textContent = t;
+        th.style.padding = '6px'; th.style.border = '1px solid #ddd'; th.style.background = '#fafafa'; th.style.position = 'sticky'; th.style.top = '0'; th.style.zIndex = '2';
+        headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    types.forEach(att => {
+        const tr = document.createElement('tr');
+        const th = document.createElement('th'); th.textContent = att; th.style.textAlign = 'left'; th.style.padding = '6px'; th.style.border = '1px solid #ddd'; th.style.background = '#fff';
+        tr.appendChild(th);
+        types.forEach(def => {
+            const td = document.createElement('td');
+            const mult = (eff[att] && eff[att][def] !== undefined) ? eff[att][def] : 1;
+            td.textContent = mult;
+            td.style.padding = '6px'; td.style.border = '1px solid #eee'; td.style.textAlign = 'center';
+            if (mult === 2) td.style.background = '#e0f2e9';
+            else if (mult === 0.5) td.style.background = '#fff3e0';
+            else if (mult === 0) td.style.background = '#f0f0f0';
+            else td.style.background = '#ffffff';
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    container.appendChild(table);
+}
+
+function openTypeChartModal() {
+    document.getElementById('type-chart-modal').style.display = 'block';
+    renderTypeChart();
+}
+
+function closeTypeChartModal() {
+    document.getElementById('type-chart-modal').style.display = 'none';
+}
+
+// --- Team Analysis Modal and Logic ---
+function openTeamAnalysisModal() {
+    document.getElementById('team-analysis-modal').style.display = 'block';
+}
+function closeTeamAnalysisModal() {
+    document.getElementById('team-analysis-modal').style.display = 'none';
+}
+
+function analyzeTeam(index) {
+    const teams = getTeamsFromStorage();
+    const team = teams[index];
+    if (!team) return;
+    // Ensure box data and pokedex map available
+    try { if (!window.__boxData) window.__boxData = []; } catch (e) {}
+    const eff = getTypeEffectiveness();
+
+    // Helper: resolve species types for a member
+    const getMemberTypes = (m) => {
+        try {
+            const sprite = m.sprite || '';
+            const mm = String(sprite).match(/(\d+)/);
+            const pid = mm ? Number(mm[1].replace(/^0+/, '')||mm[1]) : null;
+            let pok = null;
+            if (pid && window.__pokedexMap && window.__pokedexMap[pid]) pok = window.__pokedexMap[pid];
+            if (!pok) {
+                const base = String(sprite).replace(/\.[^.]+$/, '').split('/').pop();
+                const key = normalizeName(base);
+                if (key && window.__pokedexNameMap && window.__pokedexNameMap[key]) pok = window.__pokedexNameMap[key];
+            }
+            if (pok && (pok.types || pok.type)) {
+                const t = pok.types || (pok.type ? (Array.isArray(pok.type) ? pok.type : [pok.type]) : []);
+                return Array.isArray(t) ? t.map(x => String(x).toUpperCase()) : [String(t).toUpperCase()];
+            }
+        } catch (e) { /* ignore */ }
+        return [];
+    };
+
+    // Defensive analysis: for each attack type, count how many team members are weak (>1), neutral(1), resist(<1), immune(0)
+    const attackTypes = Object.keys(eff);
+    const defensiveSummary = {};
+    for (const at of attackTypes) defensiveSummary[at] = { weak:0, neutral:0, resist:0, immune:0 };
+    (team.members || []).forEach(member => {
+        const mtypes = getMemberTypes(member);
+        // If no types found, treat as neutral to all
+        attackTypes.forEach(at => {
+            let mult = 1;
+            if (mtypes.length === 0) mult = 1;
+            else {
+                mult = mtypes.reduce((acc, dt) => {
+                    const v = (eff[at] && eff[at][dt] !== undefined) ? eff[at][dt] : 1;
+                    return acc * v;
+                }, 1);
+            }
+            if (mult === 0) defensiveSummary[at].immune += 1;
+            else if (mult > 1) defensiveSummary[at].weak += 1;
+            else if (mult < 1) defensiveSummary[at].resist += 1;
+            else defensiveSummary[at].neutral += 1;
+        });
+    });
+
+    // Offensive analysis: collect move types from team and see which defender types they hit super-effectively
+    const moveTypes = new Set();
+    (team.members || []).forEach(m => {
+        try {
+            const q = m.quick_move || null;
+            const cs = m.charge_moves || m.charge_move || [];
+            if (q) {
+                const mm = (window.__moveMap && window.__moveMap[q]) ? window.__moveMap[q] : null;
+                if (mm && mm.type) moveTypes.add(String(mm.type).toUpperCase());
+            }
+            if (cs) {
+                const carr = Array.isArray(cs) ? cs : [cs];
+                carr.forEach(cn => {
+                    const mm = (window.__moveMap && window.__moveMap[cn]) ? window.__moveMap[cn] : null;
+                    if (mm && mm.type) moveTypes.add(String(mm.type).toUpperCase());
+                });
+            }
+        } catch (e) { /* ignore */ }
+    });
+
+    const offensiveCoverage = {};
+    attackTypes.forEach(def => offensiveCoverage[def] = 0);
+    Array.from(moveTypes).forEach(mt => {
+        attackTypes.forEach(def => {
+            const mult = (eff[mt] && eff[mt][def] !== undefined) ? eff[mt][def] : 1;
+            if (mult > 1) offensiveCoverage[def] += 1; // count how many move types can hit def super-effectively
+        });
+    });
+
+    // Render results into the modal
+    const out = document.getElementById('team-analysis-output');
+    out.innerHTML = '';
+    const title = document.createElement('div'); title.style.fontWeight = '600'; title.style.marginBottom = '8px'; title.textContent = team.name || '(Unnamed Team)';
+    out.appendChild(title);
+
+    // Defensive weaknesses (sorted)
+    const defs = Object.keys(defensiveSummary).map(k => ({ type:k, ...defensiveSummary[k] }));
+    defs.sort((a,b) => (b.weak - a.weak) || (a.resist - b.resist) || a.type.localeCompare(b.type));
+    const weakHeader = document.createElement('div'); weakHeader.style.fontWeight='600'; weakHeader.style.marginTop='6px'; weakHeader.textContent = 'Defensive weaknesses (how many team members are weak to this attack type):';
+    out.appendChild(weakHeader);
+    const weakList = document.createElement('div'); weakList.style.marginTop='6px';
+    defs.forEach(d => {
+        if (d.weak === 0) return;
+        const r = document.createElement('div'); r.textContent = `${d.type}: ${d.weak}/${(team.members||[]).length} weak`;
+        weakList.appendChild(r);
+    });
+    if (!weakList.children.length) weakList.textContent = '(no strong shared weaknesses)';
+    out.appendChild(weakList);
+
+    // Defensive resistances summary
+    const resistHeader = document.createElement('div'); resistHeader.style.fontWeight='600'; resistHeader.style.marginTop='8px'; resistHeader.textContent = 'Defensive resistances (how many team members resist this attack type):';
+    out.appendChild(resistHeader);
+    const resistList = document.createElement('div'); resistList.style.marginTop='6px';
+    defs.sort((a,b) => (b.resist - a.resist) || (a.weak - b.weak));
+    defs.forEach(d => {
+        if (d.resist === 0) return;
+        const r = document.createElement('div'); r.textContent = `${d.type}: ${d.resist}/${(team.members||[]).length} resist`;
+        resistList.appendChild(r);
+    });
+    if (!resistList.children.length) resistList.textContent = '(no notable resistances)';
+    out.appendChild(resistList);
+
+    // Offensive coverage
+    const offHeader = document.createElement('div'); offHeader.style.fontWeight='600'; offHeader.style.marginTop='8px'; offHeader.textContent = 'Offensive coverage (how many attack move types your team has that are super-effective vs each defender type):';
+    out.appendChild(offHeader);
+    const offList = document.createElement('div'); offList.style.marginTop='6px';
+    const ocEntries = Object.keys(offensiveCoverage).map(k => ({ type:k, count:offensiveCoverage[k] }));
+    ocEntries.sort((a,b) => b.count - a.count || a.type.localeCompare(b.type));
+    ocEntries.forEach(o => {
+        if (o.count === 0) return;
+        const r = document.createElement('div'); r.textContent = `${o.type}: ${o.count} move-type(s) cover this defensively`;
+        offList.appendChild(r);
+    });
+    if (!offList.children.length) offList.textContent = '(no super-effective move types found in team moves)';
+    out.appendChild(offList);
+
+    // list the team's move types
+    const moveTypesDiv = document.createElement('div'); moveTypesDiv.style.marginTop='8px'; moveTypesDiv.style.fontSize='0.95em'; moveTypesDiv.textContent = `Team move types: ${Array.from(moveTypes).join(', ') || '(none)'}`;
+    out.appendChild(moveTypesDiv);
+
+    openTeamAnalysisModal();
+}
+
+async function confirmSaveTeam() {
+    const nameInput = document.getElementById('team-name');
+    const container = document.getElementById('team-box-list');
+    const msg = document.getElementById('team-message');
+    msg.style.color = 'black'; msg.textContent = 'Saving...';
+    const checks = Array.from(container.querySelectorAll('input[type="checkbox"]'));
+    const selectedChecks = checks.filter(c => c.checked);
+    if (selectedChecks.length !== 3) { msg.style.color = 'red'; msg.textContent = 'Select exactly 3 Pokémon.'; return; }
+    // build members list that references box indices so teams reflect live box changes
+    const selected = selectedChecks.map(c => {
+        const bi = Number(c.dataset.boxIndex);
+        const boxEntry = (window.__boxData && window.__boxData[bi]) ? window.__boxData[bi] : null;
+        // store _boxIndex so render will resolve live data; also keep a small snapshot for fallback
+        return Object.assign({ _boxIndex: bi }, boxEntry ? { name: boxEntry.name, sprite: boxEntry.sprite, cp: boxEntry.cp, quick_move: boxEntry.quick_move, charge_moves: boxEntry.charge_moves } : {});
+    });
+    const teams = getTeamsFromStorage();
+    const idx = (typeof window.__editingTeamIndex === 'number') ? window.__editingTeamIndex : null;
+    const teamObj = { name: (nameInput && nameInput.value && String(nameInput.value).trim()) ? String(nameInput.value).trim() : null, members: selected };
+    if (idx !== null) {
+        teams[idx] = teamObj;
+    } else {
+        teams.push(teamObj);
+    }
+    saveTeamsToStorage(teams);
+    renderTeams();
+    msg.style.color = 'green'; msg.textContent = idx !== null ? 'Team updated.' : 'Team saved.';
+    if (idx !== null) setTimeout(closeTeamModal, 250);
+}
+
+function openEditTeam(index) {
+    openTeamModal({ editIndex: index });
+}
+
+function deleteTeam(index) {
+    const teams = getTeamsFromStorage();
+    teams.splice(index, 1);
+    saveTeamsToStorage(teams);
+    renderTeams();
+}
+
+// wire up team UI on load
+window.addEventListener('load', () => {
+    const makeTeamBtn = document.getElementById('make-team-btn');
+    if (makeTeamBtn) makeTeamBtn.addEventListener('click', () => openTeamModal());
+    const closeTeamBtn = document.getElementById('close-team-modal');
+    if (closeTeamBtn) closeTeamBtn.addEventListener('click', closeTeamModal);
+    const confirmTeamBtn = document.getElementById('confirm-team-btn');
+    if (confirmTeamBtn) confirmTeamBtn.addEventListener('click', confirmSaveTeam);
+    const typeLink = document.getElementById('open-type-chart');
+    if (typeLink) typeLink.addEventListener('click', (e) => { e.preventDefault(); openTypeChartModal(); });
+    const closeTypeBtn = document.getElementById('close-type-modal');
+    if (closeTypeBtn) closeTypeBtn.addEventListener('click', closeTypeChartModal);
+    const closeAnalysisBtn = document.getElementById('close-team-analysis');
+    if (closeAnalysisBtn) closeAnalysisBtn.addEventListener('click', closeTeamAnalysisModal);
+    renderTeams();
+});
+</script>
 </body>
 </html>
