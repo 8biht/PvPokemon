@@ -24,6 +24,8 @@ os.makedirs(DATA_DIR, exist_ok=True)
 from .config import get_config
 from .repo_factory import get_repository
 from .services import BoxService
+from . import command_handlers
+from . import projections
 from .pokemon import Pokedex
 
 # Initialize config and repository
@@ -37,6 +39,13 @@ pokedex = Pokedex.from_file(POKEDEX_PATH)
 # Create the service and pass the loaded pokedex so server-side validation
 # can consult known quick/charge moves when adding Pokemon to a box.
 service = BoxService(repo, cfg.ASSETS_DIR, pokedex=pokedex)
+# register simple in-process projections (read-model updaters) so events update
+# a read-side snapshot under backend/data/read_models. This demonstrates EDA.
+try:
+    projections.register_default_projections()
+except Exception:
+    # non-fatal if projections fail to register
+    pass
 
 
 @app.route('/')
@@ -137,7 +146,7 @@ def add_to_box(user_id):
         return jsonify(error='Missing sprite'), 400
 
     try:
-        box = service.add_to_box(user_id, name, sprite, cp, quick_move=quick_move, charge_moves=charge_moves)
+        box = command_handlers.handle_add_to_box(service, user_id, name, sprite, cp, quick_move=quick_move, charge_moves=charge_moves)
         return jsonify(box=box)
     except FileNotFoundError as fe:
         return jsonify(error=str(fe), sprite=sprite), 400
@@ -150,7 +159,7 @@ def add_to_box(user_id):
 @app.route('/api/v1/box/<string:user_id>/<int:slot>', methods=['DELETE'])
 def remove_from_box(user_id, slot):
     try:
-        removed, box = service.remove_from_box(user_id, slot)
+        removed, box = command_handlers.handle_remove_from_box(service, user_id, slot)
         return jsonify(removed=removed, box=box)
     except IndexError:
         return jsonify(error='Invalid slot index'), 400
@@ -175,7 +184,7 @@ def update_box_entry(user_id, slot):
         return jsonify(error='Missing sprite'), 400
 
     try:
-        box = service.update_entry(user_id, slot, name, sprite, cp, quick_move=quick_move, charge_moves=charge_moves)
+        box = command_handlers.handle_update_box_entry(service, user_id, slot, name, sprite, cp, quick_move=quick_move, charge_moves=charge_moves)
         return jsonify(box=box)
     except FileNotFoundError as fe:
         return jsonify(error=str(fe), sprite=sprite), 400

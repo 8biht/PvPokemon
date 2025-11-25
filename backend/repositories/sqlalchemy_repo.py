@@ -8,24 +8,54 @@ from ..dto import BoxEntry
 
 
 class SQLAlchemyBoxesRepository:
-    """Repository implementation using SQLAlchemy and SQLite.
+    """Repository implementation using SQLAlchemy.
 
-    The database URL is `sqlite:///backend/data/pvpokemon.db` by default.
+    Supports optional read/write splitting by providing separate `write_db_url`
+    (primary) and `read_db_url` (replica). If no split is configured the
+    repository uses a single engine for both reads and writes.
     """
 
-    def __init__(self, db_url: str = None):
-        if db_url is None:
+    def __init__(self, write_db_url: str = None, read_db_url: str = None):
+        # Determine fallback single-db URL when none provided
+        if not write_db_url and not read_db_url:
             db_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'pvpokemon.db')
-            db_url = f'sqlite:///{os.path.abspath(db_path)}'
-        self.engine = create_engine(db_url, connect_args={"check_same_thread": False})
-        Base.metadata.create_all(self.engine)
-        self.SessionLocal = sessionmaker(bind=self.engine)
+            single = f'sqlite:///{os.path.abspath(db_path)}'
+            write_db_url = write_db_url or single
+            read_db_url = read_db_url or single
 
-    def _session(self) -> Session:
-        return self.SessionLocal()
+        # If only one url provided, use it for both roles
+        write_db_url = write_db_url or read_db_url
+        read_db_url = read_db_url or write_db_url
+
+        # create engines
+        # Note: for SQLite in-process usage we keep the check_same_thread=false when using file URLs
+        if write_db_url.startswith('sqlite:'):
+            self.write_engine = create_engine(write_db_url, connect_args={"check_same_thread": False})
+        else:
+            self.write_engine = create_engine(write_db_url)
+
+        if read_db_url.startswith('sqlite:'):
+            self.read_engine = create_engine(read_db_url, connect_args={"check_same_thread": False})
+        else:
+            # create a separate engine for reads; in many setups this points to a replica
+            self.read_engine = create_engine(read_db_url)
+
+        # Ensure schema exists on the write engine (primary)
+        Base.metadata.create_all(self.write_engine)
+
+        # Session factories
+        self.WriteSession = sessionmaker(bind=self.write_engine)
+        self.ReadSession = sessionmaker(bind=self.read_engine)
+
+    def _write_session(self) -> Session:
+        return self.WriteSession()
+
+    def _read_session(self) -> Session:
+        return self.ReadSession()
 
     def get_box(self, user_id: str) -> List[BoxEntry]:
-        with self._session() as s:
+        # Use read session for queries so reads can be routed to a replica when configured
+        with self._read_session() as s:
             entries = s.query(BoxEntryModel).filter(BoxEntryModel.user_id == user_id).order_by(BoxEntryModel.id).all()
             result = []
             for e in entries:
@@ -37,7 +67,8 @@ class SQLAlchemyBoxesRepository:
             return result
 
     def add_entry(self, user_id: str, entry: BoxEntry) -> List[BoxEntry]:
-        with self._session() as s:
+        # Writes should go to the primary/write DB
+        with self._write_session() as s:
             user = s.get(User, user_id)
             if user is None:
                 user = User(id=user_id)
@@ -57,10 +88,11 @@ class SQLAlchemyBoxesRepository:
                                   charge_move=ch_serial)
             s.add(model)
             s.commit()
+            # after commit, return latest box using read path (may be eventually consistent)
             return self.get_box(user_id)
 
     def remove_entry(self, user_id: str, index: int) -> Tuple[BoxEntry, List[BoxEntry]]:
-        with self._session() as s:
+        with self._write_session() as s:
             entries = s.query(BoxEntryModel).filter(BoxEntryModel.user_id == user_id).order_by(BoxEntryModel.id).all()
             if index < 0 or index >= len(entries):
                 raise IndexError('Invalid slot index')
@@ -72,7 +104,7 @@ class SQLAlchemyBoxesRepository:
 
     def update_entry(self, user_id: str, index: int, entry: BoxEntry) -> List[BoxEntry]:
         """Update an existing entry at `index` for `user_id` and return the updated box."""
-        with self._session() as s:
+        with self._write_session() as s:
             entries = s.query(BoxEntryModel).filter(BoxEntryModel.user_id == user_id).order_by(BoxEntryModel.id).all()
             if index < 0 or index >= len(entries):
                 raise IndexError('Invalid slot index')
