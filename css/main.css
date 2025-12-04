@@ -2,10 +2,20 @@
 
 * {
     text-align: center;
+    color: #423781;
+    border-radius: 6px;
+}
+
+body {
+    background-image: url("../pvpokemon bg.png");
+    background-size: 111vh;
 }
 
 #open-type-chart {
+    display: inline-block;
     text-align: left;
-    text-decoration: None;
+    text-decoration: none;
+    font-weight: bold;
     font-size: 24px;
+    margin-top: 20vh;
 }
