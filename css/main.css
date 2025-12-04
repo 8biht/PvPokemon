@@ -1,0 +1,11 @@
+/* center elements, make mobile friendly, mess with colors, set font to arial, make team recommendation visually match other elements */
+
+* {
+    text-align: center;
+}
+
+#open-type-chart {
+    text-align: left;
+    text-decoration: None;
+    font-size: 24px;
+}

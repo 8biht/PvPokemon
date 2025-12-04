@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PvPokemon</title>
+    <link rel="stylesheet" href="css/main.css">
     <style>
         /* Minimal layout */
         #sprites-list img { margin:4px; border:2px solid transparent; }
@@ -13,29 +14,12 @@
     </head>
 <body>
     <div class="wrap"></div>
-        <nav>
-            <a href="#" class="menu-open hide-desktop">
-    <!--<img src="blah" alt="blah">-->
-            </a>
-            <ul>
-                <li>
-                    <a href="#" id="open-type-chart">Type Matchup Chart</a>
-                </li>
-                <li>
-                    <button>Share/Export Team</button>
-                </li>
-            </ul>
-        </nav>
-
+        <a href="#" id="open-type-chart">Type Matchup Chart</a> <br> <br>
+            
         <header>
             <button id="add-pokemon-btn">Add Pokemon</button>
             <button id="make-team-btn">Make Team</button>
         </header>
-
-        <!-- <div class="current-roster">
-            <h1>Current Roster</h1>
-            <button>see more</button>
-        </div> -->
 
         <div class="recommended-teams">
             <h2>Recommended Teams</h2>
@@ -45,14 +29,6 @@
                 <button id="generate-from-box-btn" style="margin-left:8px">Recommend From My Box</button>
             </div>
             <div id="recommended-teams-output" style="margin-top:8px;"></div>
-        </div>
-
-        <div class="type-chart hide-mobile">
-            <a href="#">Type Matchup Chart</a>
-        </div>
-
-        <div class="share-team hide-mobile">
-            <button>Share/Export Team</button>
         </div>
 
         <!-- Add Pokemon modal -->
