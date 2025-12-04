@@ -1,4 +1,75 @@
 {
   "user_id": "local_user",
-  "box": []
+  "box": [
+    {
+      "name": null,
+      "sprite": "pokemon_icon_151_00.png",
+      "cp": 2345678,
+      "quick_move": "POUND",
+      "charge_moves": [
+        "PSYCHIC"
+      ],
+      "charge_move": "PSYCHIC"
+    },
+    {
+      "name": null,
+      "sprite": "pokemon_icon_384_51.png",
+      "cp": 1234879654376,
+      "quick_move": "AIR_SLASH",
+      "charge_moves": [
+        "OUTRAGE"
+      ],
+      "charge_move": "OUTRAGE"
+    },
+    {
+      "name": null,
+      "sprite": "pokemon_icon_493_21.png",
+      "cp": 56567785334546580,
+      "quick_move": "IRON_TAIL",
+      "charge_moves": [
+        "HYPER_BEAM"
+      ],
+      "charge_move": "HYPER_BEAM"
+    },
+    {
+      "name": null,
+      "sprite": "pokemon_icon_025_01_25.png",
+      "cp": 4321,
+      "quick_move": "THUNDER_SHOCK",
+      "charge_moves": [
+        "WILD_CHARGE"
+      ],
+      "charge_move": "WILD_CHARGE"
+    },
+    {
+      "name": null,
+      "sprite": "pokemon_icon_003_01.png",
+      "cp": 1232,
+      "quick_move": "RAZOR_LEAF",
+      "charge_moves": [
+        "SOLAR_BEAM"
+      ],
+      "charge_move": "SOLAR_BEAM"
+    },
+    {
+      "name": null,
+      "sprite": "pokemon_icon_378_00.png",
+      "cp": 321,
+      "quick_move": "FROST_BREATH",
+      "charge_moves": [
+        "FOCUS_BLAST"
+      ],
+      "charge_move": "FOCUS_BLAST"
+    },
+    {
+      "name": null,
+      "sprite": "pokemon_icon_107_00.png",
+      "cp": 2221112,
+      "quick_move": "COUNTER",
+      "charge_moves": [
+        "POWER_UP_PUNCH"
+      ],
+      "charge_move": "POWER_UP_PUNCH"
+    }
+  ]
 }

@@ -199,3 +199,43 @@ def update_box_entry(user_id, slot):
 if __name__ == '__main__':
     app.run(debug=True)
 
+
+@app.route('/api/v1/recommend', methods=['POST'])
+def recommend_team():
+    """Return a recommended team of 3 pokemons.
+
+    Accepts JSON body with optional keys:
+    - 'opponent_types': ["FIRE", "WATER", ...] (tokens or raw strings)
+    - 'opponent_sprites': ["pokemon_icon_025_00.png", ...] (server will extract ids)
+    """
+    payload = request.get_json(force=True, silent=True) or {}
+    opp_types = payload.get('opponent_types')
+    opp_sprites = payload.get('opponent_sprites')
+    # derive types from sprites if provided
+    derived = None
+    if opp_sprites and isinstance(opp_sprites, list):
+        derived = []
+        from .pokemon import _extract_id_from_filename
+        for s in opp_sprites:
+            try:
+                pid = _extract_id_from_filename(s)
+                if pid is not None:
+                    p = pokedex.get(pid)
+                    if p and p.types:
+                        derived.extend([t for t in (p.types or []) if t])
+            except Exception:
+                continue
+
+    final_opp = None
+    if opp_types:
+        final_opp = opp_types
+    elif derived:
+        final_opp = derived
+
+    try:
+        box_user_id = payload.get('box_user_id')
+        team = service.recommend_team(opponent_types=final_opp, box_user_id=box_user_id)
+        return jsonify(team=team)
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+

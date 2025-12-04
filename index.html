@@ -39,7 +39,12 @@
 
         <div class="recommended-teams">
             <h2>Recommended Teams</h2>
-            <button>generate more</button>
+            <div id="opponent-type-selector" style="margin-top:8px; margin-bottom:8px;"></div>
+            <div style="margin-top:6px; margin-bottom:6px;">
+                <button id="generate-recommend-btn">Generate Recommendation</button>
+                <button id="generate-from-box-btn" style="margin-left:8px">Recommend From My Box</button>
+            </div>
+            <div id="recommended-teams-output" style="margin-top:8px;"></div>
         </div>
 
         <div class="type-chart hide-mobile">
@@ -1668,10 +1673,86 @@ function deleteTeam(index) {
     renderTeams();
 }
 
+// Call the backend recommendation endpoint and render a suggested team
+async function generateRecommendation() {
+    const out = document.getElementById('recommended-teams-output');
+    if (!out) return;
+    out.textContent = 'Generating recommendation...';
+    try {
+        const body = {};
+        // read selected types from the selector buttons
+        const selected = getSelectedOpponentTypes();
+        if (selected && selected.length) body.opponent_types = selected;
+        const resp = await fetch(`${API_BASE}/api/v1/recommend`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const j = await resp.json();
+        if (!resp.ok) throw new Error(j.error || 'Recommendation failed');
+        const team = j.team || j.recommendation || j;
+        renderRecommendedTeam(team);
+    } catch (e) {
+        out.textContent = 'Error: ' + e.message;
+    }
+}
+
+function renderRecommendedTeam(team) {
+    const out = document.getElementById('recommended-teams-output');
+    if (!out) return;
+    out.innerHTML = '';
+    if (!team || !Array.isArray(team) || team.length === 0) { out.textContent = '(no recommendation)'; return; }
+    const container = document.createElement('div'); container.style.display = 'flex'; container.style.gap = '12px';
+    team.forEach(m => {
+        try {
+            const col = document.createElement('div'); col.style.display = 'flex'; col.style.flexDirection = 'column'; col.style.alignItems = 'center'; col.style.width = '96px';
+            const img = document.createElement('img'); img.src = m.sprite ? `${API_BASE}/assets/${encodeURIComponent(m.sprite)}` : ''; img.style.width = '64px'; img.style.height = '64px'; img.style.objectFit = 'cover';
+            const name = document.createElement('div'); name.style.fontWeight = '600'; name.style.marginTop = '6px'; name.style.textAlign = 'center'; name.textContent = m.name || `#${m.poke_id}`;
+            const types = document.createElement('div'); types.style.fontSize='0.85em'; types.style.color='#444'; types.textContent = (m.types || []).map(prettyType).join(' • ');
+            const moves = document.createElement('div'); moves.style.fontSize='0.85em'; moves.style.color='#333'; moves.style.marginTop='6px';
+            const qm = m.quick_move ? (typeof m.quick_move === 'string' ? prettyMoveName(m.quick_move) : prettyMoveName(m.quick_move.name || '')) : '';
+            const cm = m.charge_move ? (typeof m.charge_move === 'string' ? prettyMoveName(m.charge_move) : prettyMoveName(m.charge_move.name || '')) : '';
+            moves.textContent = [qm && `Q:${qm}`, cm && `C:${cm}`].filter(Boolean).join(' • ');
+            col.appendChild(img); col.appendChild(name); col.appendChild(types); col.appendChild(moves);
+            container.appendChild(col);
+        } catch (e) { /* ignore */ }
+    });
+    out.appendChild(container);
+}
+
+function getSelectedOpponentTypes() {
+    try {
+        const container = document.getElementById('opponent-type-selector');
+        if (!container) return [];
+        const btns = Array.from(container.querySelectorAll('button.type-btn'));
+        return btns.filter(b => b.classList.contains('selected')).map(b => b.dataset.type).filter(Boolean);
+    } catch (e) { return []; }
+}
+
+async function generateRecommendationFromBox() {
+    const out = document.getElementById('recommended-teams-output');
+    if (!out) return;
+    out.textContent = 'Generating recommendation from your box...';
+    try {
+        const body = {};
+        const selected = getSelectedOpponentTypes();
+        if (selected && selected.length) body.opponent_types = selected;
+        // request limited to user's box
+        body.box_user_id = USER_ID;
+        const resp = await fetch(`${API_BASE}/api/v1/recommend`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const j = await resp.json();
+        if (!resp.ok) throw new Error(j.error || 'Recommendation failed');
+        const team = j.team || j.recommendation || j;
+        renderRecommendedTeam(team);
+    } catch (e) {
+        out.textContent = 'Error: ' + e.message;
+    }
+}
+
 // wire up team UI on load
 window.addEventListener('load', () => {
     const makeTeamBtn = document.getElementById('make-team-btn');
     if (makeTeamBtn) makeTeamBtn.addEventListener('click', () => openTeamModal());
+        const genBtn = document.getElementById('generate-recommend-btn');
+        if (genBtn) genBtn.addEventListener('click', () => generateRecommendation());
+        const genBoxBtn = document.getElementById('generate-from-box-btn');
+        if (genBoxBtn) genBoxBtn.addEventListener('click', () => generateRecommendationFromBox());
     const closeTeamBtn = document.getElementById('close-team-modal');
     if (closeTeamBtn) closeTeamBtn.addEventListener('click', closeTeamModal);
     const confirmTeamBtn = document.getElementById('confirm-team-btn');
@@ -1683,6 +1764,26 @@ window.addEventListener('load', () => {
     const closeAnalysisBtn = document.getElementById('close-team-analysis');
     if (closeAnalysisBtn) closeAnalysisBtn.addEventListener('click', closeTeamAnalysisModal);
     renderTeams();
+    // build opponent type selector buttons
+    try {
+        const types = Object.keys(getTypeEffectiveness());
+        const container = document.getElementById('opponent-type-selector');
+        if (container) {
+            container.innerHTML = '';
+            types.forEach(t => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'type-btn';
+                b.dataset.type = t;
+                b.style.margin = '2px';
+                b.style.padding = '6px 8px';
+                b.style.fontSize = '12px';
+                b.textContent = prettyType(t);
+                b.addEventListener('click', () => { b.classList.toggle('selected'); b.style.background = b.classList.contains('selected') ? '#2a9df4' : ''; b.style.color = b.classList.contains('selected') ? '#fff' : ''; });
+                container.appendChild(b);
+            });
+        }
+    } catch (e) { /* ignore */ }
 });
 </script>
 </body>
