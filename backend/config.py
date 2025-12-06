@@ -17,6 +17,12 @@ class Config:
     # Assets dir override
     BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     ASSETS_DIR = os.getenv('ASSETS_DIR') or os.path.join(BASE_DIR, 'PokeMiners pogo_assets master Images-Pokemon - 256x256')
+    # JWT secret used to sign access tokens (override via env in production)
+    JWT_SECRET = os.getenv('JWT_SECRET') or 'dev-jwt-secret'
+    # Access token lifetime in seconds (default 15 minutes)
+    ACCESS_TOKEN_EXP = int(os.getenv('ACCESS_TOKEN_EXP') or 900)
+    # Refresh token lifetime in seconds (used for client-side logic; server keeps refresh tokens until revoked)
+    REFRESH_TOKEN_EXP = int(os.getenv('REFRESH_TOKEN_EXP') or 60 * 60 * 24 * 7)
 
 
 def get_config() -> Config:

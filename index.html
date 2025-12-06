@@ -16,6 +16,10 @@
     <div class="wrap"></div>
         <a href="#" id="open-type-chart">Type Matchup Chart</a> <br> <br>
             
+        <!-- Startup sign-in modal removed: use dedicated `signin.html` page instead -->
+
+        <!-- Top-right Sign Out button (visible when signed in) -->
+        <button id="top-signout-btn" style="position:fixed; top:8px; right:12px; display:none; z-index:2100;">Sign Out</button>
         <header>
             <button id="add-pokemon-btn">Add Pokemon</button>
             <button id="make-team-btn">Make Team</button>
@@ -112,7 +116,89 @@
 
 <script>
 const API_BASE = 'http://127.0.0.1:5000';
-const USER_ID = 'local_user';
+let USER_ID = null; // populated from localStorage or sign-in
+
+// If no access token is present, require users to sign in on the dedicated page.
+// Mobile clients should store and send JWTs; the web UI will store tokens in localStorage.
+if (!localStorage.getItem('access_token')) {
+    // avoid redirect loop if we're already on signin.html
+    if (!window.location.pathname.endsWith('signin.html')) {
+        window.location = 'signin.html';
+    }
+}
+
+// --- Simple sign-in helpers (username-only, stored locally) ---
+function setUser(id) {
+    USER_ID = id ? String(id).trim() : null;
+    if (USER_ID) {
+        localStorage.setItem('pvp_user', USER_ID);
+        const signedInEl = document.getElementById('signed-in');
+        const signedOutEl = document.getElementById('signed-out');
+        const signedInUser = document.getElementById('signed-in-user');
+        if (signedInEl) signedInEl.style.display = '';
+        if (signedOutEl) signedOutEl.style.display = 'none';
+        if (signedInUser) signedInUser.textContent = USER_ID;
+        // also update any visible current-user spans
+        const cur = document.getElementById('current-user'); if (cur) cur.textContent = USER_ID;
+        // hide startup modal and show top-right signout
+        // show top-right signout
+        const topSignout = document.getElementById('top-signout-btn'); if (topSignout) topSignout.style.display = '';
+    } else {
+        localStorage.removeItem('pvp_user');
+        // remove JWT tokens on sign-out
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        const signedInEl = document.getElementById('signed-in');
+        const signedOutEl = document.getElementById('signed-out');
+        if (signedInEl) signedInEl.style.display = 'none';
+        if (signedOutEl) signedOutEl.style.display = '';
+        const cur = document.getElementById('current-user'); if (cur) cur.textContent = 'local_user';
+        // redirect to dedicated sign-in page
+        const topSignout = document.getElementById('top-signout-btn'); if (topSignout) topSignout.style.display = 'none';
+        // Use a short timeout to allow any UI cleanup before redirecting
+        setTimeout(() => { window.location = 'signin.html'; }, 80);
+    }
+}
+
+async function signInFromInput() {
+    let inEl = document.getElementById('startup-username');
+    if (!inEl) inEl = document.getElementById('signin-username');
+    if (!inEl) return;
+    const name = String(inEl.value || '').trim();
+    if (!name) { alert('Please enter a username'); return; }
+    // attempt to register user server-side (idempotent)
+    try {
+        await fetch(`${API_BASE}/api/v1/users`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: name }) });
+    } catch (e) {
+        console.warn('User registration failed (continuing locally):', e);
+    }
+    setUser(name);
+    // refresh box/team views for new user
+    try { loadTeam(); renderTeams(); } catch (e) { /* ignore */ }
+}
+
+function signOut() {
+    setUser(null);
+    try { loadTeam(); renderTeams(); } catch (e) { /* ignore */ }
+    // ensure sign-out redirects to the dedicated signin page
+    setTimeout(() => { window.location = 'signin.html'; }, 120);
+}
+
+function initUser() {
+    const stored = localStorage.getItem('pvp_user');
+    if (stored && stored.trim()) setUser(stored.trim());
+    else setUser(null);
+    // wire events
+    const signinBtn = document.getElementById('signin-btn');
+    if (signinBtn) signinBtn.addEventListener('click', signInFromInput);
+    const signoutBtn = document.getElementById('signout-btn');
+    if (signoutBtn) signoutBtn.addEventListener('click', () => signOut());
+    const topSignout = document.getElementById('top-signout-btn');
+    if (topSignout) topSignout.addEventListener('click', () => signOut());
+}
+// initialize user state from localStorage
+initUser();
+
 
 // Open/close modal
 // Use a wrapper so the click Event isn't passed into openAddModal (which treats objects as options)

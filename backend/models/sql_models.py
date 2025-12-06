@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, Boolean, DateTime
 from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.sql import func
 
 Base = declarative_base()
 
@@ -7,6 +8,8 @@ Base = declarative_base()
 class User(Base):
     __tablename__ = 'users'
     id = Column(String(64), primary_key=True)
+    # store a password hash for credential-based login (nullable for service accounts)
+    password_hash = Column(String(255), nullable=True)
 
 
 class BoxEntry(Base):
@@ -21,3 +24,14 @@ class BoxEntry(Base):
     charge_move = Column(String(400), nullable=True)
 
     user = relationship('User', backref='box_entries')
+
+
+class RefreshToken(Base):
+    __tablename__ = 'refresh_tokens'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    token = Column(String(255), unique=True, index=True, nullable=False)
+    user_id = Column(String(64), ForeignKey('users.id'), index=True)
+    revoked = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship('User', backref='refresh_tokens')

@@ -5,3 +5,5 @@ requests
 flask-cors
 SQLAlchemy
 alembic
+PyJWT
+Werkzeug

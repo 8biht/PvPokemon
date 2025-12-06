@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sign In - PvPokemon</title>
+  <link rel="stylesheet" href="css/main.css">
+  <style>body{font-family:Arial,Helvetica,sans-serif;background:#f7f7f7;} .card{max-width:420px;margin:10vh auto;padding:18px;background:#fff;border:1px solid #ddd;border-radius:6px;} .tabs{display:flex;gap:8px;margin-bottom:12px;} .tabs button{flex:1;padding:8px}</style>
+</head>
+<body>
+  <div class="card">
+    <h2>Sign In / Sign Up</h2>
+    <div class="tabs">
+      <button id="tab-login">Login</button>
+      <button id="tab-signup">Sign Up</button>
+    </div>
+
+    <div id="form-area">
+      <!-- login form by default -->
+      <div id="login-form">
+        <label>Username</label>
+        <input id="login-username" style="width:100%;padding:8px;margin-top:6px;margin-bottom:10px;" />
+        <label>Password</label>
+        <input id="login-password" type="password" style="width:100%;padding:8px;margin-top:6px;margin-bottom:10px;" />
+        <div style="text-align:right;"><button id="login-btn">Login</button></div>
+        <div id="login-msg" style="color:red;margin-top:8px;"></div>
+      </div>
+
+      <div id="signup-form" style="display:none;">
+        <label>Username</label>
+        <input id="signup-username" style="width:100%;padding:8px;margin-top:6px;margin-bottom:10px;" />
+        <label>Password</label>
+        <input id="signup-password" type="password" style="width:100%;padding:8px;margin-top:6px;margin-bottom:10px;" />
+        <div style="text-align:right;"><button id="signup-btn">Create account</button></div>
+        <div id="signup-msg" style="color:red;margin-top:8px;"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const API_BASE = 'http://127.0.0.1:5000';
+function showLogin(){ document.getElementById('login-form').style.display=''; document.getElementById('signup-form').style.display='none'; }
+function showSignup(){ document.getElementById('login-form').style.display='none'; document.getElementById('signup-form').style.display=''; }
+document.getElementById('tab-login').addEventListener('click', showLogin);
+document.getElementById('tab-signup').addEventListener('click', showSignup);
+
+async function doLogin(){
+  const user = document.getElementById('login-username').value.trim();
+  const pw = document.getElementById('login-password').value;
+  document.getElementById('login-msg').textContent = '';
+  if(!user || !pw){ document.getElementById('login-msg').textContent='Provide username and password'; return; }
+  try{
+    const r = await fetch(`${API_BASE}/api/v1/login`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username:user, password:pw }) });
+    const j = await r.json();
+    if(!r.ok){ document.getElementById('login-msg').textContent = j.error || 'Login failed'; return; }
+    // store tokens
+    localStorage.setItem('pvp_user', user);
+    localStorage.setItem('access_token', j.access_token);
+    localStorage.setItem('refresh_token', j.refresh_token);
+    window.location = 'index.html';
+  }catch(e){ document.getElementById('login-msg').textContent = 'Network error'; }
+}
+
+async function doSignup(){
+  const user = document.getElementById('signup-username').value.trim();
+  const pw = document.getElementById('signup-password').value;
+  document.getElementById('signup-msg').textContent = '';
+  if(!user || !pw){ document.getElementById('signup-msg').textContent='Provide username and password'; return; }
+  try{
+    const r = await fetch(`${API_BASE}/api/v1/signup`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ username:user, password:pw }) });
+    const j = await r.json();
+    if(!r.ok){ document.getElementById('signup-msg').textContent = j.error || 'Signup failed'; return; }
+    // show friendly confirmation then log in
+    document.getElementById('signup-msg').style.color = 'green';
+    document.getElementById('signup-msg').textContent = j.message || 'Account created';
+    // give the user a brief moment to see the message
+    setTimeout(async ()=>{ await doLogin(); }, 800);
+  }catch(e){ document.getElementById('signup-msg').style.color = 'red'; document.getElementById('signup-msg').textContent = 'Network error'; }
+}
+
+document.getElementById('login-btn').addEventListener('click', doLogin);
+document.getElementById('signup-btn').addEventListener('click', doSignup);
+
+// keyboard support
+document.getElementById('login-password').addEventListener('keydown', (e)=>{ if(e.key==='Enter') doLogin(); });
+document.getElementById('signup-password').addEventListener('keydown', (e)=>{ if(e.key==='Enter') doSignup(); });
+</script>
+</body>
+</html>

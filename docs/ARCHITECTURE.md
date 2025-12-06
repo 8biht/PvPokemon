@@ -6,11 +6,34 @@ Purpose
 - Provide a compact, practical overview of the current code structure and recommended next steps for production readiness.
 
 Layered design (current)
-- Presentation (frontend): `index.html` — static UI that calls backend APIs.
-- API / Controller: `backend/PokeApp.py` — Flask routes that accept requests and return JSON.
-- Service layer: `backend/services.py` — business rules and validation (BoxService).
-- Repository / Persistence: `backend/repository.py` — file-based JSON storage (BoxesRepository). Swap for a DB later.
+- Presentation (frontend): `index.html` and static pages — UI that calls backend APIs.
+- API / Controllers: `backend/PokeApp.py` — Flask routes that accept requests and return JSON.
+- Service layer: `backend/services.py` — business rules and validation (`BoxService`).
+- Repository / Persistence: `backend/repositories` — SQLAlchemy-backed `SQLAlchemyBoxesRepository` (preferred).
 - Domain / DTOs: `backend/dto.py` — `BoxEntry` dataclass used to pass data between layers.
+
+Dependency Injection & Composition
+- A small composition root lives at `backend/di.py` which centralizes creation of:
+  - configuration (`backend/config.py`),
+  - repository (via `repo_factory.py`),
+  - `Pokedex` loader,
+  - `BoxService` (service layer).
+
+This improves testability (tests can create a `Container` with test doubles) and keeps wiring in one place.
+
+Diagrams
+- Architecture is described in this document. (No external PlantUML file included.)
+
+Design patterns applied
+- Repository: `backend/repositories/sqlalchemy_repo.py` isolates persistence details.
+- Factory: `repo_factory.get_repository()` chooses repository implementations.
+- Service Layer: `backend/services.py` encapsulates business logic.
+- Dependency Injection (composition root): `backend/di.py`.
+
+Next steps for finalization
+1. Refactor route registration into a function that accepts the container so handlers can accept injected dependencies (planned).
+2. Add Alembic migrations for schema evolution.
+3. Add more UML class diagrams documenting `BoxService`, `SQLAlchemyBoxesRepository`, and `User`/`RefreshToken` models.
 
 Why this layout?
 - Separates responsibilities: handlers stay thin, business rules are testable in services, and persistence details are isolated in repository classes.

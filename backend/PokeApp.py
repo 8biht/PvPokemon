@@ -27,18 +27,45 @@ from .services import BoxService
 from . import command_handlers
 from . import projections
 from .pokemon import Pokedex
+from .di import build_container
+import uuid
+import datetime
+import jwt
+import importlib
 
-# Initialize config and repository
-cfg = get_config()
-repo = get_repository(DATA_DIR)
+# Defensive check: if the imported `jwt` module doesn't provide `encode`,
+# give a clear runtime hint so users can install the correct package
+# (PyJWT) or remove a conflicting `jwt` module from their PYTHONPATH.
+_JWT_MODULE_PATH = getattr(jwt, '__file__', '<built-in or unknown>')
+_JWT_HAS_ENCODE = hasattr(jwt, 'encode')
+if not _JWT_HAS_ENCODE:
+    # attempt to show what package is available
+    try:
+        pkg = importlib.import_module('jwt')
+        _JWT_MODULE_PATH = getattr(pkg, '__file__', _JWT_MODULE_PATH)
+    except Exception:
+        pass
+from werkzeug.security import generate_password_hash, check_password_hash
 
-# Try to load a pokedex JSON (user-provided) from the data folder
-POKEDEX_PATH = os.path.join(DATA_DIR, 'pokedex.json')
-pokedex = Pokedex.from_file(POKEDEX_PATH)
+# Initialize wiring via DI container (composition root)
+container = build_container(DATA_DIR)
+cfg = container.cfg
+repo = container.repo
+pokedex = container.pokedex
+service = container.service
 
-# Create the service and pass the loaded pokedex so server-side validation
-# can consult known quick/charge moves when adding Pokemon to a box.
-service = BoxService(repo, cfg.ASSETS_DIR, pokedex=pokedex)
+# Ensure repository runtime migration helper runs (SQLite dev DBs) to add
+# `password_hash` column or other small schema fixes if the DB predates models.
+try:
+    _helper = getattr(repo, '_ensure_users_password_column', None)
+    if callable(_helper):
+        try:
+            _helper()
+        except Exception:
+            # best-effort, non-fatal
+            pass
+except Exception:
+    pass
 # register simple in-process projections (read-model updaters) so events update
 # a read-side snapshot under backend/data/read_models. This demonstrates EDA.
 try:
@@ -200,6 +227,35 @@ if __name__ == '__main__':
     app.run(debug=True)
 
 
+@app.route('/api/v1/users', methods=['POST'])
+def create_user():
+    """Create a new user with the provided id (username).
+
+    Body: { "id": "username" }
+    The server will create a `User` record if it does not already exist.
+    This endpoint is idempotent and returns `{ created: bool, id: <id> }`.
+    """
+    payload = request.get_json(force=True, silent=True) or {}
+    uid = payload.get('id') or payload.get('username')
+    if not uid or not isinstance(uid, str) or not uid.strip():
+        return jsonify(error='Missing or invalid id/username'), 400
+    uid = uid.strip()
+    try:
+        # If repository supports ensure_user, use it. Otherwise try service.
+        created = False
+        try:
+            created = repo.ensure_user(uid)
+        except Exception:
+            try:
+                created = service.create_user(uid)
+            except Exception:
+                # fallback: no-op but return success (idempotent)
+                created = False
+        return jsonify(created=bool(created), id=uid)
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+
 @app.route('/api/v1/recommend', methods=['POST'])
 def recommend_team():
     """Return a recommended team of 3 pokemons.
@@ -236,6 +292,105 @@ def recommend_team():
         box_user_id = payload.get('box_user_id')
         team = service.recommend_team(opponent_types=final_opp, box_user_id=box_user_id)
         return jsonify(team=team)
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+
+# --- Authentication endpoints (JWT access + refresh tokens) ---
+def _create_access_token(uid: str):
+    now = datetime.datetime.utcnow()
+    exp = now + datetime.timedelta(seconds=cfg.ACCESS_TOKEN_EXP)
+    payload = { 'sub': uid, 'iat': int(now.timestamp()), 'exp': int(exp.timestamp()) }
+    # Ensure the jwt module provides the expected API
+    if not _JWT_HAS_ENCODE:
+        # Provide a helpful runtime error so the developer can fix their env
+        raise RuntimeError(
+            f"JWT encode function not available. Install PyJWT (pip install PyJWT) "
+            f"or remove any local module named 'jwt'. Detected module path: {_JWT_MODULE_PATH}"
+        )
+    token = jwt.encode(payload, cfg.JWT_SECRET, algorithm='HS256')
+    if isinstance(token, bytes):
+        token = token.decode('utf-8')
+    return token
+
+
+@app.route('/api/v1/signup', methods=['POST'])
+def signup():
+    payload = request.get_json(force=True, silent=True) or {}
+    username = payload.get('username')
+    password = payload.get('password')
+    if not username or not password:
+        return jsonify(error='username and password required'), 400
+    username = str(username).strip()
+    try:
+        existing = None
+        try:
+            existing = repo.get_user(username)
+        except Exception:
+            existing = None
+        if existing and existing.password_hash:
+            return jsonify(error='User already exists'), 400
+        pw_hash = generate_password_hash(password)
+        repo.set_user_password(username, pw_hash)
+        return jsonify(created=True, id=username, message='Account created')
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+
+@app.route('/api/v1/login', methods=['POST'])
+def login():
+    payload = request.get_json(force=True, silent=True) or {}
+    username = payload.get('username')
+    password = payload.get('password')
+    if not username or not password:
+        return jsonify(error='username and password required'), 400
+    try:
+        user = repo.get_user(username)
+        if not user or not user.password_hash:
+            return jsonify(error='Invalid credentials'), 401
+        if not check_password_hash(user.password_hash, password):
+            return jsonify(error='Invalid credentials'), 401
+        try:
+            access = _create_access_token(username)
+        except RuntimeError as re:
+            # return a helpful server error for misconfigured environments
+            return jsonify(error=str(re)), 500
+        refresh = uuid.uuid4().hex
+        repo.create_refresh_token(username, refresh)
+        return jsonify(access_token=access, refresh_token=refresh)
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+
+@app.route('/api/v1/refresh', methods=['POST'])
+def refresh_token():
+    payload = request.get_json(force=True, silent=True) or {}
+    token = payload.get('refresh_token')
+    if not token:
+        return jsonify(error='refresh_token required'), 400
+    try:
+        rt = repo.get_refresh_token(token)
+        if not rt or getattr(rt, 'revoked', False):
+            return jsonify(error='Invalid refresh token'), 401
+        uid = rt.user_id
+        new_refresh = uuid.uuid4().hex
+        repo.revoke_refresh_token(token)
+        repo.create_refresh_token(uid, new_refresh)
+        access = _create_access_token(uid)
+        return jsonify(access_token=access, refresh_token=new_refresh)
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+
+@app.route('/api/v1/logout', methods=['POST'])
+def logout():
+    payload = request.get_json(force=True, silent=True) or {}
+    token = payload.get('refresh_token')
+    if not token:
+        return jsonify(error='refresh_token required'), 400
+    try:
+        ok = repo.revoke_refresh_token(token)
+        return jsonify(revoked=bool(ok))
     except Exception as e:
         return jsonify(error=str(e)), 500
 
