@@ -33,17 +33,27 @@ class SQLAlchemyBoxesRepository:
         read_db_url = read_db_url or write_db_url
 
         # create engines
-        # Note: for SQLite in-process usage we keep the check_same_thread=false when using file URLs
-        if write_db_url.startswith('sqlite:'):
-            self.write_engine = create_engine(write_db_url, connect_args={"check_same_thread": False})
+        # If write and read URLs are identical, use a single engine instance so
+        # in-memory SQLite (sqlite:///:memory:) and other single-db uses share the same DB.
+        if write_db_url == read_db_url:
+            if write_db_url.startswith('sqlite:'):
+                engine = create_engine(write_db_url, connect_args={"check_same_thread": False})
+            else:
+                engine = create_engine(write_db_url)
+            self.write_engine = engine
+            self.read_engine = engine
         else:
-            self.write_engine = create_engine(write_db_url)
+            # Note: for SQLite in-process usage we keep the check_same_thread=false when using file URLs
+            if write_db_url.startswith('sqlite:'):
+                self.write_engine = create_engine(write_db_url, connect_args={"check_same_thread": False})
+            else:
+                self.write_engine = create_engine(write_db_url)
 
-        if read_db_url.startswith('sqlite:'):
-            self.read_engine = create_engine(read_db_url, connect_args={"check_same_thread": False})
-        else:
-            # create a separate engine for reads; in many setups this points to a replica
-            self.read_engine = create_engine(read_db_url)
+            if read_db_url.startswith('sqlite:'):
+                self.read_engine = create_engine(read_db_url, connect_args={"check_same_thread": False})
+            else:
+                # create a separate engine for reads; in many setups this points to a replica
+                self.read_engine = create_engine(read_db_url)
 
         # Ensure schema exists on the write engine (primary)
         Base.metadata.create_all(self.write_engine)
