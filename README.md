@@ -33,6 +33,17 @@ pip install -r requirements.txt
 pytest -q
 ```
 
+Coverage
+
+Run tests with coverage locally (requires `pytest-cov`):
+
+```powershell
+pip install pytest-cov
+pytest --cov=backend --cov-report=term --cov-report=html:coverage_html
+```
+
+This will produce a `coverage.xml` and an HTML report in `coverage_html/` when run in CI or with the `--cov-report=html:coverage_html` flag.
+
 CI
 
 A GitHub Actions workflow is provided at `.github/workflows/ci.yml` which runs tests on push and PRs to `development` and `main`.
