@@ -1,0 +1,51 @@
+name: CD
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    name: Build, test and deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: |
+          python -m pytest -q
+
+      - name: Create deployment artifact
+        run: |
+          mkdir -p deploy
+          # package backend and frontend static files
+          zip -r deploy/pvpokemon-deploy.zip backend README.md docs css index.html signin.html || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pvpokemon-deploy
+          path: deploy/pvpokemon-deploy.zip
+
+      # Optional: SCP deploy to a remote server if secrets are configured
+      - name: Deploy via SCP (optional)
+        if: ${{ secrets.SSH_HOST }}
+        uses: appleboy/scp-action@v0.1.5
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          source: "deploy/pvpokemon-deploy.zip"
+          target: ${{ secrets.REMOTE_PATH || '~/deploy' }}

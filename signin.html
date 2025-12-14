@@ -38,7 +38,11 @@
   </div>
 
 <script>
-const API_BASE = 'http://127.0.0.1:5000';
+// Use current host so mobile devices on the same Wi‑Fi can reach the backend.
+const API_BASE = (() => {
+  try { const host = window.location.hostname || '127.0.0.1'; return `${window.location.protocol}//${host}:5000`; }
+  catch (e) { return 'http://127.0.0.1:5000'; }
+})();
 function showLogin(){ document.getElementById('login-form').style.display=''; document.getElementById('signup-form').style.display='none'; }
 function showSignup(){ document.getElementById('login-form').style.display='none'; document.getElementById('signup-form').style.display=''; }
 document.getElementById('tab-login').addEventListener('click', showLogin);

@@ -115,7 +115,17 @@
     </div>
 
 <script>
-const API_BASE = 'http://127.0.0.1:5000';
+// Use the current host so mobile devices on the same Wi‑Fi can reach the backend.
+// This builds a base like "http://<pc-ip>:5000" when the frontend is served
+// from the development machine (e.g. `python -m http.server --bind 0.0.0.0`).
+const API_BASE = (() => {
+    try {
+        const host = window.location.hostname || '127.0.0.1';
+        return `${window.location.protocol}//${host}:5000`;
+    } catch (e) {
+        return 'http://127.0.0.1:5000';
+    }
+})();
 let USER_ID = null; // populated from localStorage or sign-in
 
 // If no access token is present, require users to sign in on the dedicated page.

@@ -1,0 +1,15 @@
+{
+  "user_id": "Test",
+  "box": [
+    {
+      "name": "Shit Face",
+      "sprite": "pokemon_icon_025_00_47.png",
+      "cp": 36495,
+      "quick_move": "THUNDER_SHOCK",
+      "charge_moves": [
+        "DISCHARGE"
+      ],
+      "charge_move": "DISCHARGE"
+    }
+  ]
+}
