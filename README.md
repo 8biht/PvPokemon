@@ -3,28 +3,21 @@ recommendation system for PvP teams in Pokemon GO
 
 Quick start (development)
 
-1. Create and activate a virtual environment (PowerShell):
+1. Install dependencies:
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-```
-
-2. Install dependencies:
-
-```powershell
-pip install --upgrade pip
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-3. Start the backend (Flask):
+2. Start the backend (Flask):
 
 ```powershell
 # from repo root
 python -m flask --app backend.PokeApp --debug run --host 127.0.0.1 --port 5000
 ```
 
-4. Serve the frontend (static files) in another terminal:
+3. Serve the frontend (static files) in another terminal:
 
 ```powershell
 python -m http.server 3000 --directory .
@@ -68,9 +61,7 @@ ipconfig
 2. Start the backend bound to all interfaces (so other devices on the LAN can reach it):
 
 ```powershell
-$env:FLASK_APP='backend.PokeApp'
-$env:FLASK_ENV='development'
-python -m flask run --host 0.0.0.0 --port 5000
+$env:FLASK_APP='backend.PokeApp'; $env:FLASK_ENV='development'; python -m flask run --host 0.0.0.0 --port 5000
 ```
 
 3. Serve the frontend static files and bind to all interfaces:
@@ -88,7 +79,7 @@ New-NetFirewallRule -DisplayName "PvPokemon Frontend 3000" -Direction Inbound -L
 
 5. Open the app on your phone (same Wi‑Fi):
 
-- Frontend: http://<PC_IP>:3000 (example: http://192.168.68.57:3000)
+- Frontend: http://<PC_IP>:3000 (replace `<PC_IP>` with your PC's Wi‑Fi IPv4 address)
 - Backend ping/test: http://<PC_IP>:5000/ping (should return {"message":"pong"})
 
 Notes and troubleshooting
@@ -105,20 +96,5 @@ That will give a public HTTPS URL you can open on your phone. Keep tunnels short
 
 Security
 - These steps are intended for local development and testing only. Binding to `0.0.0.0` and opening firewall ports exposes the service to your local network — do not use this configuration on untrusted networks.
-
-# PvPokemon Simplified instructions
-recommendation system for PvP teams in Pokemon GO
-
-Install Requirements from requirements.txt
-
-Enter directory
-
-In Powershell one run: python -m py_compile "backend\PokeApp.py"
-
-In Powershell one run: python -m flask --app backend.PokeApp --debug run --host 127.0.0.1 --port 5000
-
-In another Powershell, change directories and run: python -m http.server 3000 --directory .
-
-In a browser go to: http://127.0.0.1:3000/#
 
 Team members: Cody Benna, Brooklyn Hunt
