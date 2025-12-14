@@ -1,5 +1,3 @@
-python
-pip
 Flask
 requests
 flask-cors
@@ -7,3 +5,4 @@ SQLAlchemy
 alembic
 PyJWT
 Werkzeug
+pytest
