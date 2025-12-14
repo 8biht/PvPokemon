@@ -16,8 +16,12 @@ class SQLAlchemyBoxesRepository:
     repository uses a single engine for both reads and writes.
     """
 
-    def __init__(self, write_db_url: str = None, read_db_url: str = None):
+    def __init__(self, write_db_url: str = None, read_db_url: str = None, db_url: str = None):
         # Determine fallback single-db URL when none provided
+        # backward-compat: accept legacy `db_url` argument and map to write_db_url
+        if db_url and not write_db_url:
+            write_db_url = db_url
+
         if not write_db_url and not read_db_url:
             db_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'pvpokemon.db')
             single = f'sqlite:///{os.path.abspath(db_path)}'
